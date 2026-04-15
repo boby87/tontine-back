@@ -12,6 +12,12 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(AuthentificationEchoueeException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentificationEchouee(AuthentificationEchoueeException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(new ErrorResponse("AUTH_FAILED", ex.getMessage()));
+    }
+
     @ExceptionHandler(MembreIntrouvableException.class)
     public ResponseEntity<ErrorResponse> handleMembreIntrouvable(MembreIntrouvableException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

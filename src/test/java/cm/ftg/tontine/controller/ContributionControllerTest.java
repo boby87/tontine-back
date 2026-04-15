@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,12 +28,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ContributionController.class)
 @Import({ContributionMapper.class, GlobalExceptionHandler.class})
+@WithMockUser
 @DisplayName("ContributionController")
 class ContributionControllerTest {
 
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private ContributionService contributionService;
+    @MockitoBean private cm.ftg.tontine.security.JwtTokenProvider jwtTokenProvider;
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 4, 10, 12, 0);
 

@@ -1,3 +1,29 @@
 spring:
   application:
     name: tontine
+  threads:
+    virtual:
+      enabled: true
+
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:4200
+  jwt:
+    # Secret ≥ 256 bits (32 caractères min) — EN PRODUCTION : utiliser un vault externe !
+    secret: TontineApp-Secret-Key-Dev-Only-Min-32-Chars!!
+    expiration-ms: 900000  # 15 minutes (security-rules §1.3)
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+  show-actuator: false
+  packages-to-scan: cm.ftg.tontine.controller
+  default-produces-media-type: application/json
+

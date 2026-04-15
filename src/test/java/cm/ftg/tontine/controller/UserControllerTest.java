@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,12 +29,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(UserController.class)
 @Import({UserMapper.class, GlobalExceptionHandler.class})
+@WithMockUser
 @DisplayName("UserController")
 class UserControllerTest {
 
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private UserService userService;
+    @MockitoBean private cm.ftg.tontine.security.JwtTokenProvider jwtTokenProvider;
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 4, 11, 10, 0);
 
@@ -240,6 +243,7 @@ class UserControllerTest {
     class Consulter {
 
         @Test
+        @WithMockUser
         @DisplayName("Doit retourner 200 avec le profil quand l'utilisateur existe")
         void should_return200_when_userExists() throws Exception {
             // Arrange
@@ -257,6 +261,7 @@ class UserControllerTest {
         }
 
         @Test
+        @WithMockUser
         @DisplayName("Doit retourner 404 quand l'utilisateur n'existe pas")
         void should_return404_when_userNotFound() throws Exception {
             // Arrange
