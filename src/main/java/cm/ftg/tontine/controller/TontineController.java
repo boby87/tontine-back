@@ -1,8 +1,7 @@
 package cm.ftg.tontine.controller;
 
 import cm.ftg.tontine.controller.doc.TontineControllerDoc;
-import cm.ftg.tontine.service.CreateTontineRequest;
-import cm.ftg.tontine.service.TontineService;
+import cm.ftg.tontine.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class TontineController implements TontineControllerDoc {
 
     private final TontineService tontineService;
+    private final TontineInvitationService invitationService;
     private final TontineMapper tontineMapper;
 
     @Override
@@ -38,5 +38,43 @@ public class TontineController implements TontineControllerDoc {
 
         var result = tontineService.findById(id);
         return ResponseEntity.ok(tontineMapper.toResponse(result));
+    }
+
+    @PostMapping("/{tontineId}/invite-link")
+    public ResponseEntity<InviteLinkResult> genererLienInvitation(
+            @PathVariable Long tontineId,
+            @RequestParam String requestedByUserId,
+            @RequestParam(required = false) Integer maxUses) {
+
+        log.debug("POST /api/v1/tontines/{}/invite-link — VirtualThread={}",
+            tontineId, Thread.currentThread().isVirtual());
+
+        var request = new GenerateInviteLinkRequest(tontineId, requestedByUserId, maxUses);
+        var result = invitationService.genererInvitation(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    @PostMapping("/invitations/validate")
+    public ResponseEntity<InvitationValidationResult> validerToken(@RequestParam String token) {
+
+        log.debug("POST /api/v1/tontines/invitations/validate — VirtualThread={}",
+            Thread.currentThread().isVirtual());
+
+        var result = invitationService.validerToken(token);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/{tontineId}/members/by-reference")
+    public ResponseEntity<AddMemberResult> ajouterMembreParReference(
+            @PathVariable Long tontineId,
+            @Valid @RequestBody AddMemberByReferenceRequest request) {
+
+        log.debug("POST /api/v1/tontines/{}/members/by-reference — VirtualThread={}",
+            tontineId, Thread.currentThread().isVirtual());
+
+        // Assurer la cohérence entre le path et le body
+        var effectiveRequest = new AddMemberByReferenceRequest(tontineId, request.requestedByUserId(), request.reference());
+        var result = tontineService.ajouterMembreParReference(effectiveRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 }

@@ -25,6 +25,15 @@ Tu es un **expert métier des tontines** et un architecte Java senior. Tu maîtr
 
 ## Règles de gestion que tu maîtrises
 
+## 📚 Sources de Vérité (Contexte Projet)
+Pour toute génération de code ou de logique métier, tu dois te référer aux fichiers suivants présents dans le dépôt :
+- `Cahier_des_Charges.md` : Vision globale et règles générales.
+- `Flows_President.md` : Workflows de validation et pouvoirs de direction.
+- `Flows_Secretaire.md` : Gestion administrative, ODJ, PV et pointage.
+- `Flows_CommissaireAuxComptes.md` : Protocoles d'audit et certification financière.
+- `Flows_Censeur.md` : Logique de discipline et calcul des amendes.
+- `Flows_Membre.md` : Parcours d'adhésion, cotisations et cautionnement.
+
 ### 1. Cycle de rotation
 
 - Une tontine fonctionne par **cycles**. Un cycle regroupe N séances (généralement hebdomadaires ou mensuelles), où N = nombre de membres.

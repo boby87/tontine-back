@@ -39,4 +39,10 @@ public class NoOpNotificationService implements NotificationService {
         log.debug("Notification sanction appliquée (no-op) : id={}, membre={}",
             result.sanctionId(), result.memberId());
     }
+
+    @Override
+    public void notifierInvitationMembre(AddMemberResult result, String tontineNom) {
+        log.debug("Notification invitation membre (no-op) : userId={}, tontine={}",
+            result.userId(), tontineNom);
+    }
 }

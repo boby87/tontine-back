@@ -141,6 +141,74 @@ public class TontineService {
         );
     }
 
+
+    // ──────────────────────────────────────────────
+    //  Ajout d'un membre par référence (email/téléphone)
+    // ──────────────────────────────────────────────
+
+    /**
+     * Le Président ajoute un utilisateur via son email ou téléphone.
+     * Si l'utilisateur existe, il est enregistré en EN_ATTENTE et reçoit une notification.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public AddMemberResult ajouterMembreParReference(AddMemberByReferenceRequest request) {
+
+        var tontine = verifierTontineExiste(request.tontineId());
+        verifierUtilisateurExiste(request.requestedByUserId());
+        verifierEstPresident(request.tontineId(), request.requestedByUserId());
+
+        // Recherche de l'utilisateur par email ou téléphone
+        var utilisateur = userRepository.findByEmailOrPhone(request.reference(), request.reference())
+            .orElseThrow(() -> new UtilisateurIntrouvableException(
+                "Aucun utilisateur trouvé avec la référence : " + request.reference()));
+
+        // Vérifier qu'il n'est pas déjà membre
+        if (tontineMemberRepository.existsByTontineIdAndUserId(request.tontineId(), utilisateur.getId())) {
+            throw new MembreDejaExistantException(request.tontineId(), utilisateur.getId());
+        }
+
+        // Déterminer l'ordre de rotation (prochain disponible)
+        int nextOrder = tontineMemberRepository.countByTontineIdAndStatus(
+            request.tontineId(), TontineMemberStatus.ACTIF) + 1;
+
+        var membre = new TontineMember();
+        membre.setTontine(tontine);
+        membre.setUser(utilisateur);
+        membre.setRole(TontineRole.MEMBRE);
+        membre.setStatus(TontineMemberStatus.EN_ATTENTE);
+        membre.setJoinedAt(LocalDateTime.now());
+        membre.setRotationOrder(nextOrder);
+
+        membre = tontineMemberRepository.save(membre);
+
+        var result = new AddMemberResult(
+            membre.getId(),
+            tontine.getId(),
+            utilisateur.getId(),
+            utilisateur.getEmail(),
+            membre.getRole(),
+            membre.getStatus(),
+            membre.getJoinedAt()
+        );
+
+        // Notification post-commit sur Virtual Thread
+        final String tontineNom = tontine.getNom();
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    notificationExecutor.submit(() ->
+                        notificationService.notifierInvitationMembre(result, tontineNom));
+                }
+            }
+        );
+
+        log.info("Membre ajouté par référence [tontine={}, userId={}, statut=EN_ATTENTE] — VirtualThread={}",
+            tontine.getId(), utilisateur.getId(), Thread.currentThread().isVirtual());
+
+        return result;
+    }
+
     // ──────────────────────────────────────────────
     //  Pré-validations (Skill étape 1)
     // ──────────────────────────────────────────────
@@ -148,6 +216,29 @@ public class TontineService {
     private User verifierUtilisateurExiste(String userId) {
         return userRepository.findById(userId)
             .orElseThrow(() -> new UtilisateurIntrouvableException(userId));
+    }
+
+    private Tontine verifierTontineExiste(Long tontineId) {
+        return tontineRepository.findByIdAndDeletedAtIsNull(tontineId)
+            .orElseThrow(() -> new TontineIntrouvableException(tontineId));
+    }
+
+    /**
+     * Vérifie que l'utilisateur est PRESIDENT de la tontine.
+     * Méthode publique utilisée par le contrôleur pour sécuriser l'accès QR Code.
+     */
+    public void verifierEstPresidentPublic(Long tontineId, String userId) {
+        verifierEstPresident(tontineId, userId);
+    }
+
+    private void verifierEstPresident(Long tontineId, String userId) {
+        var membre = tontineMemberRepository.findByTontineIdAndUserId(tontineId, userId)
+            .orElseThrow(() -> new AccesNonAutoriseException(
+                "L'utilisateur %s n'est pas membre de la tontine %d".formatted(userId, tontineId)));
+        if (membre.getRole() != TontineRole.PRESIDENT) {
+            throw new AccesNonAutoriseException(
+                "Seul le PRESIDENT peut effectuer cette opération (rôle actuel : %s)".formatted(membre.getRole()));
+        }
     }
 
     private void verifierNomUnique(String nom) {

@@ -14,7 +14,7 @@ import java.io.IOException;
  * Filtre d'authentification JWT — extrait le Bearer token du header Authorization
  * et peuple le SecurityContext.
  *
- * <p>Conformément à security-rules.skill.md §1.4.</p>
+ * <p>Conformément à SKILL.md §1.4.</p>
  *
  * <p>Compatible Virtual Threads : pas de bloc {@code synchronized},
  * pas de {@code ThreadLocal} de longue durée — le SecurityContext est

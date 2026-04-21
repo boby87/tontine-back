@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Service d'authentification — vérifie les identifiants et génère un token JWT.
  *
- * <p>Conformément à security-rules.skill.md §1, §4, §5 :</p>
+ * <p>Conformément à SKILL.md §1, §4, §5 :</p>
  * <ul>
  *   <li>Ne jamais révéler si c'est l'email ou le mot de passe qui est incorrect</li>
  *   <li>Masquer les données sensibles dans les logs</li>

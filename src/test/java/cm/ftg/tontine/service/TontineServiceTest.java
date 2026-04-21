@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
@@ -258,6 +259,150 @@ class TontineServiceTest {
             assertThatThrownBy(() -> tontineService.findById(99L))
                 .isInstanceOf(TontineIntrouvableException.class)
                 .hasMessageContaining("99");
+        }
+    }
+
+
+    // ──────────────────────────────────────────────
+    //  ajouterMembreParReference()
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("ajouterMembreParReference()")
+    class AjouterMembreParReference {
+
+        @BeforeEach
+        void initTransactionContext() {
+            TransactionSynchronizationManager.initSynchronization();
+        }
+
+        @AfterEach
+        void clearTransactionContext() {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.clearSynchronization();
+            }
+        }
+
+        @Test
+        @DisplayName("Doit ajouter un membre EN_ATTENTE quand l'utilisateur existe et que le demandeur est PRESIDENT")
+        void should_addMemberAsPending_when_validRequest() {
+            // Arrange
+            var tontine = new Tontine();
+            tontine.setId(1L);
+            tontine.setNom("Tontine A");
+            when(tontineRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(tontine));
+            when(userRepository.findById("user-1")).thenReturn(Optional.of(defaultUser));
+
+            var president = new TontineMember();
+            president.setRole(TontineRole.PRESIDENT);
+            when(tontineMemberRepository.findByTontineIdAndUserId(1L, "user-1"))
+                .thenReturn(Optional.of(president));
+
+            var targetUser = new User();
+            targetUser.setId("user-2");
+            targetUser.setEmail("target@test.com");
+            when(userRepository.findByEmailOrPhone("target@test.com", "target@test.com"))
+                .thenReturn(Optional.of(targetUser));
+
+            when(tontineMemberRepository.existsByTontineIdAndUserId(1L, "user-2")).thenReturn(false);
+            when(tontineMemberRepository.countByTontineIdAndStatus(1L, TontineMemberStatus.ACTIF)).thenReturn(1);
+
+            when(tontineMemberRepository.save(any(TontineMember.class))).thenAnswer(invocation -> {
+                var m = invocation.getArgument(0, TontineMember.class);
+                m.setId("member-new");
+                return m;
+            });
+
+            var request = new AddMemberByReferenceRequest(1L, "user-1", "target@test.com");
+
+            // Act
+            var result = tontineService.ajouterMembreParReference(request);
+
+            // Assert
+            assertThat(result.memberId()).isEqualTo("member-new");
+            assertThat(result.status()).isEqualTo(TontineMemberStatus.EN_ATTENTE);
+            assertThat(result.role()).isEqualTo(TontineRole.MEMBRE);
+            assertThat(result.userId()).isEqualTo("user-2");
+
+            verify(tontineMemberRepository).save(argThat(m ->
+                m.getRole() == TontineRole.MEMBRE
+                && m.getStatus() == TontineMemberStatus.EN_ATTENTE
+                && m.getRotationOrder() == 2
+            ));
+        }
+
+        @Test
+        @DisplayName("Doit lancer MembreDejaExistantException quand l'utilisateur est déjà membre")
+        void should_throwException_when_memberAlreadyExists() {
+            // Arrange
+            var tontine = new Tontine();
+            tontine.setId(1L);
+            when(tontineRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(tontine));
+            when(userRepository.findById("user-1")).thenReturn(Optional.of(defaultUser));
+
+            var president = new TontineMember();
+            president.setRole(TontineRole.PRESIDENT);
+            when(tontineMemberRepository.findByTontineIdAndUserId(1L, "user-1"))
+                .thenReturn(Optional.of(president));
+
+            var existingUser = new User();
+            existingUser.setId("user-2");
+            when(userRepository.findByEmailOrPhone("+237600000001", "+237600000001"))
+                .thenReturn(Optional.of(existingUser));
+            when(tontineMemberRepository.existsByTontineIdAndUserId(1L, "user-2")).thenReturn(true);
+
+            var request = new AddMemberByReferenceRequest(1L, "user-1", "+237600000001");
+
+            // Act & Assert
+            assertThatThrownBy(() -> tontineService.ajouterMembreParReference(request))
+                .isInstanceOf(MembreDejaExistantException.class);
+        }
+
+        @Test
+        @DisplayName("Doit lancer UtilisateurIntrouvableException quand la référence ne correspond à aucun utilisateur")
+        void should_throwException_when_referenceNotFound() {
+            // Arrange
+            var tontine = new Tontine();
+            tontine.setId(1L);
+            when(tontineRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(tontine));
+            when(userRepository.findById("user-1")).thenReturn(Optional.of(defaultUser));
+
+            var president = new TontineMember();
+            president.setRole(TontineRole.PRESIDENT);
+            when(tontineMemberRepository.findByTontineIdAndUserId(1L, "user-1"))
+                .thenReturn(Optional.of(president));
+
+            when(userRepository.findByEmailOrPhone("unknown@test.com", "unknown@test.com"))
+                .thenReturn(Optional.empty());
+
+            var request = new AddMemberByReferenceRequest(1L, "user-1", "unknown@test.com");
+
+            // Act & Assert
+            assertThatThrownBy(() -> tontineService.ajouterMembreParReference(request))
+                .isInstanceOf(UtilisateurIntrouvableException.class)
+                .hasMessageContaining("unknown@test.com");
+        }
+
+        @Test
+        @DisplayName("Doit lancer AccesNonAutoriseException quand le demandeur n'est pas PRESIDENT")
+        void should_throwException_when_requesterIsNotPresident() {
+            // Arrange
+            var tontine = new Tontine();
+            tontine.setId(1L);
+            when(tontineRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(tontine));
+            when(userRepository.findById("user-1")).thenReturn(Optional.of(defaultUser));
+
+            var tresorier = new TontineMember();
+            tresorier.setRole(TontineRole.TRESORIER);
+            when(tontineMemberRepository.findByTontineIdAndUserId(1L, "user-1"))
+                .thenReturn(Optional.of(tresorier));
+
+            var request = new AddMemberByReferenceRequest(1L, "user-1", "target@test.com");
+
+            // Act & Assert
+            assertThatThrownBy(() -> tontineService.ajouterMembreParReference(request))
+                .isInstanceOf(AccesNonAutoriseException.class)
+                .hasMessageContaining("PRESIDENT");
         }
     }
 }

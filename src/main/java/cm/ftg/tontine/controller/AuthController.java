@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Contrôleur d'authentification — endpoint de login.
- * Conformément à controller-layer.skill.md : injection par constructeur,
+ * Conformément à SKILL.md : injection par constructeur,
  * traçabilité Virtual Thread, documentation séparée.
  */
 @RestController

@@ -13,4 +13,7 @@ public interface SanctionRepository extends JpaRepository<Sanction, String> {
     List<Sanction> findByMemberIdAndStatus(String memberId, SanctionStatus status);
 
     List<Sanction> findBySessionId(Long sessionId);
+
+    /** Nombre de sanctions avec un statut donné pour une tontine (via member → tontine) */
+    int countByMember_Tontine_IdAndStatus(Long tontineId, SanctionStatus status);
 }

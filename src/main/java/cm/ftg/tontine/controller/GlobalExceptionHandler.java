@@ -114,6 +114,24 @@ public class GlobalExceptionHandler {
             .body(new ErrorResponse("TONTINE_MEMBER_NOT_FOUND", ex.getMessage()));
     }
 
+    @ExceptionHandler(MembreDejaExistantException.class)
+    public ResponseEntity<ErrorResponse> handleMembreDejaExistant(MembreDejaExistantException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(new ErrorResponse("DUPLICATE_MEMBER", ex.getMessage()));
+    }
+
+    @ExceptionHandler(AccesNonAutoriseException.class)
+    public ResponseEntity<ErrorResponse> handleAccesNonAutorise(AccesNonAutoriseException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(new ErrorResponse("ACCESS_DENIED", ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvitationInvalideException.class)
+    public ResponseEntity<ErrorResponse> handleInvitationInvalide(InvitationInvalideException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(new ErrorResponse("INVALID_INVITATION", ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()

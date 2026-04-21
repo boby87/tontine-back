@@ -20,7 +20,7 @@ import java.util.List;
 
 /**
  * Fournisseur JWT — génération, parsing et validation des tokens.
- * Conformément à security-rules.skill.md §1.3 :
+ * Conformément à SKILL.md §1.3 :
  * <ul>
  *   <li>Claims obligatoires : sub (userId), roles, iat, exp</li>
  *   <li>Aucune donnée sensible dans le token</li>

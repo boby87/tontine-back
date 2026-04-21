@@ -7,4 +7,5 @@ public interface NotificationService {
     void notifierSessionPlanifiee(SessionResult result);
     void notifierInscription(UserResult result);
     void notifierSanctionAppliquee(SanctionResult result);
+    void notifierInvitationMembre(AddMemberResult result, String tontineNom);
 }
