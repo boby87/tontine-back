@@ -4,6 +4,8 @@ import cm.ftg.tontine.auth.entity.OtpCode;
 import cm.ftg.tontine.auth.repository.OtpCodeRepository;
 import cm.ftg.tontine.common.enums.OtpPurpose;
 import cm.ftg.tontine.common.exception.ApiException;
+import cm.ftg.tontine.integration.messaging.email.EmailSender;
+import cm.ftg.tontine.integration.messaging.sms.SmsSender;
 import java.security.SecureRandom;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -23,13 +25,19 @@ public class OtpService {
 
     private final OtpCodeRepository repository;
     private final PasswordEncoder passwordEncoder;
+    private final SmsSender smsSender;
+    private final EmailSender emailSender;
     private final long ttlSeconds;
 
     public OtpService(OtpCodeRepository repository,
                       PasswordEncoder passwordEncoder,
+                      SmsSender smsSender,
+                      EmailSender emailSender,
                       @Value("${app.security.otp.ttl-seconds:300}") long ttlSeconds) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
+        this.smsSender = smsSender;
+        this.emailSender = emailSender;
         this.ttlSeconds = ttlSeconds;
     }
 
@@ -42,9 +50,30 @@ public class OtpService {
         otp.setPurpose(purpose);
         otp.setExpiresAt(Instant.now().plusSeconds(ttlSeconds));
         repository.save(otp);
-        // En production : envoyer via SMS / Email. En dev : on logue avec un masque.
-        log.info("[OTP] purpose={} identifier={} code={} (a remplacer par envoi reel)",
-                purpose, maskIdentifier(identifier), code);
+        dispatch(identifier, purpose, code);
+    }
+
+    private void dispatch(String identifier, OtpPurpose purpose, String code) {
+        String subject = "Code de verification Tontine";
+        String body = "Votre code de verification : " + code
+                + ". Il expire dans " + (ttlSeconds / 60) + " minutes.";
+        try {
+            if (isEmail(identifier)) {
+                emailSender.send(identifier, subject,
+                        "<p>" + body + "</p>");
+            } else {
+                smsSender.send(identifier, body);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Envoi OTP purpose={} identifier={} a echoue : {}",
+                    purpose, maskIdentifier(identifier), e.getMessage());
+            throw new ApiException("OTP_DELIVERY_FAILED",
+                    "Envoi du code impossible, reessayez", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+    }
+
+    private boolean isEmail(String identifier) {
+        return identifier != null && identifier.indexOf('@') > 0;
     }
 
     @Transactional

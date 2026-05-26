@@ -3,6 +3,9 @@ package cm.ftg.tontine.treasurer.mobilemoney.service;
 import cm.ftg.tontine.audit.service.AuditService;
 import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.common.exception.ResourceNotFoundException;
+import cm.ftg.tontine.integration.mobilemoney.gateway.MobileMoneyGateway;
+import cm.ftg.tontine.integration.mobilemoney.gateway.PaymentResult;
+import cm.ftg.tontine.integration.mobilemoney.gateway.PaymentStatus;
 import cm.ftg.tontine.member.entity.Member;
 import cm.ftg.tontine.realtime.RealtimeEventPublisher;
 import cm.ftg.tontine.treasurer.cashbox.entity.CashBox;
@@ -37,19 +40,22 @@ public class MobileMoneyService {
     private final TreasurerAccessChecker accessChecker;
     private final AuditService auditService;
     private final RealtimeEventPublisher realtime;
+    private final MobileMoneyGateway gateway;
 
     public MobileMoneyService(MobileMoneyTransactionRepository repository,
                               CashBoxService cashBoxService,
                               CashBoxRepository cashBoxRepository,
                               TreasurerAccessChecker accessChecker,
                               AuditService auditService,
-                              RealtimeEventPublisher realtime) {
+                              RealtimeEventPublisher realtime,
+                              MobileMoneyGateway gateway) {
         this.repository = repository;
         this.cashBoxService = cashBoxService;
         this.cashBoxRepository = cashBoxRepository;
         this.accessChecker = accessChecker;
         this.auditService = auditService;
         this.realtime = realtime;
+        this.gateway = gateway;
     }
 
     @Transactional(readOnly = true)
@@ -126,21 +132,34 @@ public class MobileMoneyService {
                     "PIN trésorier requis", HttpStatus.valueOf(422));
         }
 
+        String externalRef = "OUT-" + UUID.randomUUID();
+        PaymentResult result = gateway.disburse(req.provider(), req.toPhone(),
+                req.amount(), externalRef, "Decaissement tontine");
+        if (result.status() == PaymentStatus.FAILED) {
+            throw new ApiException("MOBILE_MONEY_GATEWAY_FAILED",
+                    "Le fournisseur a refuse la transaction", HttpStatus.valueOf(422));
+        }
+
         MobileMoneyTransaction tx = new MobileMoneyTransaction();
         tx.setTontineId(tontineId);
         tx.setProvider(req.provider());
         tx.setDirection(MovementDirection.OUT);
         tx.setAmount(req.amount());
         tx.setToPhone(req.toPhone());
-        tx.setExternalReference(UUID.randomUUID().toString());
-        tx.setStatus(MobileMoneyStatus.APPROVED);
+        tx.setExternalReference(result.gatewayReference());
         tx.setReviewedAt(Instant.now());
         tx.setReviewedByFullName(treasurer.getFirstName() + " " + treasurer.getLastName());
+        tx.setStatus(switch (result.status()) {
+            case SUCCESS -> MobileMoneyStatus.COMPLETED;
+            case PENDING, UNKNOWN -> MobileMoneyStatus.APPROVED;
+            case FAILED -> MobileMoneyStatus.FAILED;
+        });
         MobileMoneyTransaction saved = repository.save(tx);
 
         auditService.record(userId, "MOBILE_MONEY_SEND", "MobileMoneyTransaction",
                 saved.getId().toString(), tontineId,
-                "{\"toPhone\":\"" + req.toPhone() + "\",\"amount\":\"***\"}");
+                "{\"toPhone\":\"" + req.toPhone() + "\",\"amount\":\"***\",\"gatewayRef\":\""
+                        + result.gatewayReference() + "\"}");
         return MobileMoneyTransactionDto.from(saved);
     }
 

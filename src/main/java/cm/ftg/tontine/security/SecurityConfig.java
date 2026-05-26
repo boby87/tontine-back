@@ -56,7 +56,8 @@ public class SecurityConfig {
                                 "/h2-console/**",
                                 "/actuator/health",
                                 "/actuator/info",
-                                "/ws/**"
+                                "/ws/**",
+                                "/webhooks/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))

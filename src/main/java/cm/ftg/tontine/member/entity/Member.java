@@ -66,6 +66,9 @@ public class Member {
     @Column(length = 255)
     private String avatarUrl;
 
+    @Column(name = "kyc_photo_file_id")
+    private UUID kycPhotoFileId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MemberStatus status = MemberStatus.PENDING;

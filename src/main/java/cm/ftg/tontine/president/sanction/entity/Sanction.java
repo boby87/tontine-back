@@ -100,6 +100,9 @@ public class Sanction {
     @Column(name = "contest_attachment_name", length = 255)
     private String contestAttachmentName;
 
+    @Column(name = "contest_file_id")
+    private UUID contestFileId;
+
     @Column(name = "resolved_by_user_id")
     private UUID resolvedByUserId;
 

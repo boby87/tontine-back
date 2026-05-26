@@ -33,6 +33,12 @@ spring:
         jdbc:
           time_zone: UTC
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 12MB
+
 server:
   port: 8080
   servlet:
@@ -57,6 +63,38 @@ app:
     otp:
       ttl-seconds: 300
       length: 6
+  storage:
+    backend: local
+    max-file-size-bytes: 10485760  # 10 Mo
+    local:
+      root: ./uploads
+  messaging:
+    sms:
+      provider: log   # log | twilio
+      from-number: ""
+      twilio:
+        account-sid: ""
+        auth-token: ""
+    email:
+      provider: log   # log | smtp
+      from-address: no-reply@tontine.local
+      from-name: Tontine
+  mobile-money:
+    provider: simulator   # simulator | mtn | orange
+    webhook-secret: ""
+    mtn:
+      base-url: https://sandbox.momodeveloper.mtn.com
+      subscription-key: ""
+      api-user: ""
+      api-key: ""
+      target-environment: sandbox
+      callback-url: ""
+    orange:
+      base-url: https://api.orange.com
+      client-id: ""
+      client-secret: ""
+      merchant-key: ""
+      callback-url: ""
 
 logging:
   level:

@@ -31,4 +31,6 @@ public interface ContributionRepository extends JpaRepository<Contribution, UUID
             + "WHERE c.sessionId = :sessionId AND c.status IN :statuses")
     BigDecimal sumPaidAmountBySessionAndStatuses(@Param("sessionId") UUID sessionId,
                                                   @Param("statuses") List<ContributionStatus> statuses);
+
+    List<Contribution> findBySessionIdAndStatus(UUID sessionId, ContributionStatus status);
 }

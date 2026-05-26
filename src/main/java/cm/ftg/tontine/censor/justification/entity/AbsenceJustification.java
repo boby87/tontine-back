@@ -56,6 +56,9 @@ public class AbsenceJustification {
     @Column(name = "document_size_kb")
     private Integer documentSizeKb;
 
+    @Column(name = "document_file_id")
+    private UUID documentFileId;
+
     @Column(length = 2000)
     private String reason;
 
