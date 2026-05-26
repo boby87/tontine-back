@@ -1,0 +1,67 @@
+package cm.ftg.tontine.president.vote.controller;
+
+import cm.ftg.tontine.common.dto.ApiResponse;
+import cm.ftg.tontine.president.common.TontineIdResolver;
+import cm.ftg.tontine.president.vote.dto.CreateVoteRequest;
+import cm.ftg.tontine.president.vote.dto.VoteDto;
+import cm.ftg.tontine.president.vote.service.VoteService;
+import cm.ftg.tontine.security.AuthenticatedUser;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/president/votes")
+public class VoteController {
+
+    private final VoteService service;
+    private final TontineIdResolver tontineIdResolver;
+
+    public VoteController(VoteService service, TontineIdResolver tontineIdResolver) {
+        this.service = service;
+        this.tontineIdResolver = tontineIdResolver;
+    }
+
+    @GetMapping
+    public ApiResponse<List<VoteDto>> list(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.list(t, user.id()));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<VoteDto> getById(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.findById(id, t, user.id()));
+    }
+
+    @PostMapping
+    public ApiResponse<VoteDto> create(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId,
+            @Valid @RequestBody CreateVoteRequest req) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.create(t, user.id(), req), "Vote cree");
+    }
+
+    @PostMapping("/{id}/close")
+    public ApiResponse<VoteDto> close(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.close(id, t, user.id()), "Vote cloture");
+    }
+}

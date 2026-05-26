@@ -1,0 +1,15 @@
+package cm.ftg.tontine.treasurer.cashbox.enums;
+
+public enum CashMovementKind {
+    CONTRIBUTION_IN,
+    EXTRA_CONTRIBUTION_IN,
+    SANCTION_IN,
+    LOAN_REPAYMENT_IN,
+    MOBILE_MONEY_IN,
+    CAGNOTTE_OUT,
+    LOAN_DISBURSEMENT_OUT,
+    EXPENSE_OUT,
+    SANCTION_REFUND_OUT,
+    TRANSFER_IN,
+    TRANSFER_OUT
+}
