@@ -67,19 +67,7 @@ Package racine : `cm.ftg.tontine`. Build : Maven.
 - Ne pas stocker d'état dans des `ThreadLocal` de longue durée — les Virtual Threads rendent les `ThreadLocal` coûteux en mémoire. Utiliser `ScopedValue` (Java 21 preview) quand possible.
 - Surveiller les métriques de pinning avec `-Djdk.tracePinnedThreads=short` en développement.
 
-### Base de données
 
-- Configurer HikariCP avec un pool de connexions suffisant pour éviter l'engorgement sous charge virtuelle :
-  ```yaml
-  spring:
-    datasource:
-      hikari:
-        maximum-pool-size: 50
-        minimum-idle: 10
-  ```
-- Les Virtual Threads multiplient le parallélisme : s'assurer que le pool de connexions DB ne devient pas le goulot d'étranglement.
-
----
 
 ## 3. Tests unitaires — Structure JUnit 5
 
