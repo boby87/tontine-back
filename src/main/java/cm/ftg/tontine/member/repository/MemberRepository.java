@@ -1,10 +1,13 @@
 package cm.ftg.tontine.member.repository;
 
+import cm.ftg.tontine.common.enums.UserRole;
 import cm.ftg.tontine.member.entity.Member;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -14,11 +17,19 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     Optional<Member> findByUserIdAndTontineId(UUID userId, UUID tontineId);
 
+    Optional<Member> findByIdAndTontineId(UUID id, UUID tontineId);
+
+    @Query("select m from Member m join m.roles r where m.tontineId = :tontineId and r = :role")
+    List<Member> findByTontineIdAndRole(@Param("tontineId") UUID tontineId, @Param("role") UserRole role);
+
     List<Member> findByTontineId(UUID tontineId);
 
     long countByTontineId(UUID tontineId);
 
     long countByTontineIdAndStatus(UUID tontineId, cm.ftg.tontine.common.enums.MemberStatus status);
+
+    boolean existsByTontineIdAndPhoneAndStatus(UUID tontineId, String phone,
+                                               cm.ftg.tontine.common.enums.MemberStatus status);
 
     List<Member> findByTontineIdOrderByMatriculeAsc(UUID tontineId);
 }

@@ -10,6 +10,8 @@ import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.common.exception.ResourceNotFoundException;
 import cm.ftg.tontine.member.entity.Member;
 import cm.ftg.tontine.member.repository.MemberRepository;
+import cm.ftg.tontine.president.membership.invitation.enums.InvitationChannel;
+import cm.ftg.tontine.president.membership.invitation.service.InvitationService;
 import cm.ftg.tontine.tontine.dto.CreateTontineRequest;
 import cm.ftg.tontine.tontine.dto.CycleDto;
 import cm.ftg.tontine.tontine.dto.FounderInviteDto;
@@ -37,17 +39,20 @@ public class TontineService {
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final InvitationService invitationService;
 
     public TontineService(TontineRepository tontineRepository,
                           CycleRepository cycleRepository,
                           MemberRepository memberRepository,
                           UserRepository userRepository,
-                          AuditService auditService) {
+                          AuditService auditService,
+                          InvitationService invitationService) {
         this.tontineRepository = tontineRepository;
         this.cycleRepository = cycleRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.invitationService = invitationService;
     }
 
     @Transactional(readOnly = true)
@@ -92,22 +97,21 @@ public class TontineService {
         memberRepository.save(creatorMember);
         saved.setMemberCount(1);
 
-        int matriculeSeq = 1;
+        // Auto-invitation des fondateurs (hors createur) : c'est l'acceptation de
+        // l'invitation qui creera le Member ACTIVE. Le createur reste l'unique President.
         for (FounderInviteDto f : req.founders()) {
             if (isCreator(f, creator)) {
                 continue;
             }
-            Member pending = new Member();
-            pending.setTontineId(saved.getId());
-            pending.setMatricule("M-%03d".formatted(++matriculeSeq));
-            String[] parts = f.fullName().trim().split(" ", 2);
-            pending.setFirstName(parts[0]);
-            pending.setLastName(parts.length > 1 ? parts[1] : "");
-            pending.setPhone(f.phone());
-            pending.setEmail(f.email());
-            pending.setStatus(MemberStatus.PENDING);
-            pending.setRoles(EnumSet.of(f.role(), UserRole.MEMBER));
-            memberRepository.save(pending);
+            if (f.role() == UserRole.PRESIDENT) {
+                throw new ApiException("FOUNDER_PRESIDENT_FORBIDDEN",
+                        "Un fondateur ne peut pas etre declare President", HttpStatus.valueOf(422));
+            }
+            Set<InvitationChannel> channels = EnumSet.of(InvitationChannel.SMS);
+            if (f.email() != null && !f.email().isBlank()) {
+                channels.add(InvitationChannel.EMAIL);
+            }
+            invitationService.inviteFromFounder(saved.getId(), creatorUserId, creator, f, channels);
         }
         saved.setMemberCount((int) memberRepository.countByTontineId(saved.getId()));
         tontineRepository.save(saved);

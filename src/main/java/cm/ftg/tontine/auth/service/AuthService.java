@@ -13,11 +13,16 @@ import cm.ftg.tontine.auth.dto.TokensDto;
 import cm.ftg.tontine.auth.dto.UserDto;
 import cm.ftg.tontine.auth.entity.UserEntity;
 import cm.ftg.tontine.auth.repository.UserRepository;
+import cm.ftg.tontine.common.enums.MemberStatus;
 import cm.ftg.tontine.common.enums.OtpPurpose;
 import cm.ftg.tontine.common.enums.UserRole;
 import cm.ftg.tontine.common.exception.ApiException;
+import cm.ftg.tontine.member.entity.Member;
+import cm.ftg.tontine.member.repository.MemberRepository;
 import cm.ftg.tontine.security.JwtService;
 import java.util.EnumSet;
+import java.util.Set;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,17 +32,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
     private final JwtService jwtService;
     private final AuditService auditService;
 
     public AuthService(UserRepository userRepository,
+                       MemberRepository memberRepository,
                        PasswordEncoder passwordEncoder,
                        OtpService otpService,
                        JwtService jwtService,
                        AuditService auditService) {
         this.userRepository = userRepository;
+        this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.otpService = otpService;
         this.jwtService = jwtService;
@@ -147,14 +155,14 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public UserDto me(java.util.UUID userId) {
+    public UserDto me(UUID userId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException("AUTH_REQUIRED",
                         "Session invalide", HttpStatus.UNAUTHORIZED));
-        return UserDto.from(user);
+        return UserDto.from(user, aggregateRoles(user));
     }
 
-    public void logout(java.util.UUID userId) {
+    public void logout(UUID userId) {
         // JWT stateless : la revocation cote serveur necessite une liste noire.
         // A implementer si besoin (table revoked_tokens). Ici, action tracee uniquement.
         if (userId != null) {
@@ -167,7 +175,28 @@ public class AuthService {
                 jwtService.generateAccessToken(user),
                 jwtService.generateRefreshToken(user),
                 jwtService.accessTokenTtlSeconds());
-        return new AuthSessionDto(UserDto.from(user), tokens, user.getActiveTontineId());
+        return new AuthSessionDto(
+                UserDto.from(user, aggregateRoles(user)),
+                tokens,
+                user.getActiveTontineId());
+    }
+
+    /**
+     * Union des rôles globaux du User et des rôles de chaque Membership ACTIVE.
+     * Permet au frontend d'afficher les menus liés aux rôles tontine sans appel
+     * supplémentaire. L'autorisation effective reste vérifiée côté serveur par
+     * les *AccessChecker (Président, Censeur, ...) qui contrôlent le rôle dans la
+     * tontine ciblée — un user PRESIDENT de tontine A et MEMBRE de tontine B aura
+     * "PRESIDENT" dans User.roles mais sera refusé sur /president/* de la tontine B.
+     */
+    private Set<UserRole> aggregateRoles(UserEntity user) {
+        EnumSet<UserRole> roles = EnumSet.copyOf(user.getRoles());
+        for (Member m : memberRepository.findByUserId(user.getId())) {
+            if (m.getStatus() == MemberStatus.ACTIVE) {
+                roles.addAll(m.getRoles());
+            }
+        }
+        return roles;
     }
 
     private boolean isEmail(String identifier) {

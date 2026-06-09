@@ -12,4 +12,14 @@ app:
   jwt:
     secret: TestSecretKeyForUnitTestsOnly-Must-Be-32-Chars!!
     expiration-ms: 900000
+  security:
+    jwt:
+      secret: TestSecretKeyForIntegrationTestsOnly-Must-Be-32-Chars!!
+      access-token-ttl-seconds: 900
+      refresh-token-ttl-seconds: 2592000
+      issuer: tontine-connect-test
+    bcrypt:
+      strength: 4
+  vote:
+    anonymous-secret: test-vote-anonymous-secret
 

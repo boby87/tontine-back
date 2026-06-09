@@ -13,6 +13,7 @@ import cm.ftg.tontine.president.vote.enums.VoteScope
 import cm.ftg.tontine.president.vote.enums.VoteStatus
 import cm.ftg.tontine.president.vote.repository.VoteOptionRepository
 import cm.ftg.tontine.president.vote.repository.VoteRepository
+import cm.ftg.tontine.member.vote.service.VoterEligibilityChecker
 import cm.ftg.tontine.realtime.RealtimeEventPublisher
 import spock.lang.Specification
 import spock.lang.Subject
@@ -27,10 +28,12 @@ class VoteServiceSpec extends Specification {
     AuditService auditService = Mock()
     UserRepository userRepository = Mock()
     RealtimeEventPublisher realtime = Mock()
+    VoterEligibilityChecker eligibilityChecker = Mock()
 
     @Subject
     VoteService service = new VoteService(
-            voteRepository, optionRepository, accessChecker, auditService, userRepository, realtime)
+            voteRepository, optionRepository, accessChecker, auditService, userRepository,
+            realtime, eligibilityChecker)
 
     UUID tontineId = UUID.randomUUID()
     UUID userId = UUID.randomUUID()
@@ -40,6 +43,7 @@ class VoteServiceSpec extends Specification {
         userRepository.findById(userId) >> Optional.of(new UserEntity().tap {
             firstName = 'P'; lastName = 'Resident'; email = 'p@r.com'
         })
+        eligibilityChecker.countEligible(_) >> 12
     }
 
     CreateVoteRequest req(Instant opensAt, Instant closesAt, List<String> options = ['Oui', 'Non']) {
@@ -119,10 +123,11 @@ class VoteServiceSpec extends Specification {
         ex.code == 'VOTE_INVALID_STATE'
     }
 
-    def "close : passed=true quand la premiere option est strictement majoritaire"() {
+    def "close : passed=true quand quorum atteint et premiere option strictement majoritaire"() {
         given:
         def v = new Vote().tap {
             id = voteId; it.tontineId = this.tontineId; status = VoteStatus.OPEN
+            totalVoters = 14; totalVoted = 14; quorumPercent = 50.00
         }
         voteRepository.findById(voteId) >> Optional.of(v)
         voteRepository.save(_) >> { it[0] }
@@ -144,12 +149,34 @@ class VoteServiceSpec extends Specification {
         given:
         def v = new Vote().tap {
             id = voteId; it.tontineId = this.tontineId; status = VoteStatus.OPEN
+            totalVoters = 10; totalVoted = 10; quorumPercent = 50.00
         }
         voteRepository.findById(voteId) >> Optional.of(v)
         voteRepository.save(_) >> { it[0] }
         optionRepository.findByVoteIdOrderByDisplayOrderAsc(voteId) >> [
                 new VoteOption().tap { label = 'A'; count = 5; displayOrder = 0 },
                 new VoteOption().tap { label = 'B'; count = 5; displayOrder = 1 }
+        ]
+
+        when:
+        def dto = service.close(voteId, tontineId, userId)
+
+        then:
+        !v.passed
+        dto.status == VoteStatus.CLOSED
+    }
+
+    def "close : passed=false quand le quorum n'est pas atteint malgre une majorite"() {
+        given:
+        def v = new Vote().tap {
+            id = voteId; it.tontineId = this.tontineId; status = VoteStatus.OPEN
+            totalVoters = 10; totalVoted = 2; quorumPercent = 50.00
+        }
+        voteRepository.findById(voteId) >> Optional.of(v)
+        voteRepository.save(_) >> { it[0] }
+        optionRepository.findByVoteIdOrderByDisplayOrderAsc(voteId) >> [
+                new VoteOption().tap { label = 'Oui'; count = 2; displayOrder = 0 },
+                new VoteOption().tap { label = 'Non'; count = 0; displayOrder = 1 }
         ]
 
         when:

@@ -39,6 +39,21 @@ spring:
       max-file-size: 10MB
       max-request-size: 12MB
 
+  # Transport SMTP (Gmail par defaut). Identifiants via variables d'environnement :
+  #   MAIL_USERNAME = adresse Gmail complete
+  #   MAIL_PASSWORD = mot de passe d'application Google (2FA active, PAS le mot de passe du compte)
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+
 server:
   port: 8081
   servlet:
@@ -76,9 +91,29 @@ app:
         account-sid: ""
         auth-token: ""
     email:
-      provider: log   # log | smtp
-      from-address: no-reply@tontine.local
-      from-name: Tontine
+      # log = ecrit dans les logs (dev) ; smtp = envoi reel via spring.mail.
+      # En prod : APP_EMAIL_PROVIDER=smtp + MAIL_USERNAME/MAIL_PASSWORD.
+      provider: ${APP_EMAIL_PROVIDER:log}   # log | smtp
+      # Avec Gmail, l'expediteur doit etre l'adresse authentifiee (MAIL_USERNAME).
+      from-address: ${MAIL_FROM:${MAIL_USERNAME:no-reply@tontine.local}}
+      from-name: ${MAIL_FROM_NAME:Tontine Connect}
+  presidency-transfer:
+    # Duree de validite d'une proposition de transfert de presidence (heures).
+    expiry-hours: 72
+    max-pending-per-tontine: 1             # informatif (verrouille par index unique partiel)
+    notification-channels: [IN_APP, SMS, EMAIL]
+  invitation:
+    # Duree de validite d'une invitation de membre (jours).
+    expiry-days: 7
+  frontend:
+    # Base URL de l'app frontend, utilisee pour construire les liens d'acceptation.
+    base-url: ${APP_FRONTEND_BASE_URL:https://app.tontine-connect.cm}
+  vote:
+    # Secret stable servant au hash deterministe des bulletins anonymes
+    # (SHA-256(voteId + memberId + secret)). NE JAMAIS changer apres deploiement
+    # (les anciens hash deviendraient invalides). En prod : surcharger via la
+    # variable d'environnement APP_VOTE_ANONYMOUS_SECRET (jamais committe).
+    anonymous-secret: ${APP_VOTE_ANONYMOUS_SECRET:dev-only-vote-anonymous-secret-please-replace}
   mobile-money:
     provider: simulator   # simulator | mtn | orange
     webhook-secret: ""
