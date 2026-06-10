@@ -10,6 +10,7 @@ import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.common.exception.ResourceNotFoundException;
 import cm.ftg.tontine.member.repository.MemberRepository;
 import cm.ftg.tontine.president.membership.invitation.dto.CancelInvitationRequest;
+import cm.ftg.tontine.president.membership.invitation.dto.CandidateLookupDto;
 import cm.ftg.tontine.president.membership.invitation.dto.InviteMemberRequest;
 import cm.ftg.tontine.president.membership.invitation.dto.MembershipInvitationDto;
 import cm.ftg.tontine.president.membership.invitation.entity.MembershipInvitation;
@@ -80,6 +81,44 @@ public class InvitationService {
         this.dispatcher = dispatcher;
         this.expiryDays = expiryDays;
         this.baseAcceptUrl = frontendBaseUrl + "/auth";
+    }
+
+    /**
+     * Recherche un utilisateur existant a inviter, soit par son identifiant (UUID), soit par
+     * son numero de telephone. Reserve au President de la tontine. Sert au pre-remplissage du
+     * formulaire d'invitation cote front.
+     */
+    @Transactional(readOnly = true)
+    public CandidateLookupDto lookupCandidate(UUID tontineId, UUID requesterId, String userId, String phone) {
+        accessChecker.requirePresident(requesterId, tontineId);
+        UserEntity u;
+        if (userId != null && !userId.isBlank()) {
+            UUID id;
+            try {
+                id = UUID.fromString(userId.trim());
+            } catch (IllegalArgumentException e) {
+                throw new ApiException("INVALID_IDENTIFIER",
+                        "Identifiant utilisateur invalide", UNPROCESSABLE);
+            }
+            u = userRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        } else if (phone != null && !phone.isBlank()) {
+            String normalized = phone.trim();
+            u = userRepository.findByPhone(normalized)
+                    .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", normalized));
+        } else {
+            throw new ApiException("MISSING_IDENTIFIER",
+                    "Fournir un identifiant ou un numero de telephone", UNPROCESSABLE);
+        }
+        MemberStatus memberStatus = memberRepository.findByUserIdAndTontineId(u.getId(), tontineId)
+                .map(m -> m.getStatus())
+                .orElse(null);
+        boolean alreadyMember = memberStatus == MemberStatus.ACTIVE
+                || memberStatus == MemberStatus.PENDING
+                || memberStatus == MemberStatus.SUSPENDED;
+        return new CandidateLookupDto(
+                u.getId(), u.getFirstName(), u.getLastName(),
+                u.getPhone(), u.getEmail(), alreadyMember, memberStatus);
     }
 
     @Transactional

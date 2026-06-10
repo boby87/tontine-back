@@ -3,6 +3,7 @@ package cm.ftg.tontine.president.membership.invitation.controller;
 import cm.ftg.tontine.common.dto.ApiResponse;
 import cm.ftg.tontine.president.common.TontineIdResolver;
 import cm.ftg.tontine.president.membership.invitation.dto.CancelInvitationRequest;
+import cm.ftg.tontine.president.membership.invitation.dto.CandidateLookupDto;
 import cm.ftg.tontine.president.membership.invitation.dto.InviteMemberRequest;
 import cm.ftg.tontine.president.membership.invitation.dto.MembershipInvitationDto;
 import cm.ftg.tontine.president.membership.invitation.service.InvitationService;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -38,6 +40,16 @@ public class PresidentInvitationController {
             @Valid @RequestBody InviteMemberRequest req) {
         UUID t = tontineIdResolver.resolve(user.id(), tontineId);
         return ApiResponse.ok(service.invite(t, user.id(), req), "Invitation envoyee");
+    }
+
+    @GetMapping("/candidate-lookup")
+    public ApiResponse<CandidateLookupDto> lookupCandidate(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String phone) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.lookupCandidate(t, user.id(), userId, phone));
     }
 
     @GetMapping("/invitations")
