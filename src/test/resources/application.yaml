@@ -5,6 +5,21 @@ spring:
     virtual:
       enabled: true
 
+  # Testcontainers : un conteneur PostgreSQL ephemere est demarre automatiquement
+  # grace au driver JDBC special de Testcontainers. Schema recree a chaque execution.
+  datasource:
+    url: jdbc:tc:postgresql:16-alpine:///tontine_test
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
 app:
   cors:
     allowed-origins:

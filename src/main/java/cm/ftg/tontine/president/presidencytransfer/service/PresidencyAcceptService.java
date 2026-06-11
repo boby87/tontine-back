@@ -36,10 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>L'atomicite repose sur le {@code @Version} de l'entite (verrouillage optimiste).
  * En cas de concurrence (deux accepts simultanes), un seul commit reussit ; l'autre leve
  * une {@link ConcurrencyFailureException}, traduite en {@code 409 TRANSFER_CONFLICT}.
- * On reste en {@link Isolation#READ_COMMITTED} : sous H2 (tests) un niveau superieur
- * (REPEATABLE_READ) abandonne les deux transactions en cas de contention ecriture-ecriture,
- * alors que READ_COMMITTED + {@code @Version} garantit l'exactement-une-reussite sur H2
- * comme sur PostgreSQL.</p>
+ * On reste en {@link Isolation#READ_COMMITTED} : un niveau superieur (REPEATABLE_READ)
+ * abandonnerait les deux transactions en cas de contention ecriture-ecriture, alors que
+ * READ_COMMITTED + {@code @Version} garantit l'exactement-une-reussite sur PostgreSQL.</p>
  *
  * <p>Apres acceptation, l'ancien et le nouveau President doivent rappeler {@code /auth/refresh}
  * pour obtenir un JWT portant les roles a jour.</p>

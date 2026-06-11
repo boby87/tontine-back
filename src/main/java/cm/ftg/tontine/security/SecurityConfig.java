@@ -55,7 +55,6 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
-                                "/h2-console/**",
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/ws/**",

@@ -28,7 +28,23 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<testcontainers.version>1.20.6</testcontainers.version>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<!-- BOM Testcontainers : aligne les versions des modules testcontainers
+			     (non gere par le parent Spring Boot). -->
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 
 		<dependency>
@@ -120,14 +136,24 @@
 			<version>3.5.3</version>
 		</dependency>
 
+		<!-- PostgreSQL — base de donnees (runtime, conteneurisee via Podman) -->
 		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Testcontainers — PostgreSQL ephemere pour les tests d'integration.
+		     Active via l'URL JDBC jdbc:tc:postgresql:... (aucune config Java requise).
+		     Necessite Podman/Docker actif pendant l'execution des tests. -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

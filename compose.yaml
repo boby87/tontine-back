@@ -1,0 +1,40 @@
+# Conteneurisation de la base de donnees PostgreSQL pour l'application Tontine.
+#
+# Outil : Podman (et non Docker). Commandes equivalentes :
+#   podman compose up -d          # demarrer en arriere-plan
+#   podman compose logs -f db     # suivre les logs
+#   podman compose down           # arreter (les donnees sont conservees dans le volume)
+#   podman compose down -v        # arreter ET supprimer les donnees
+#
+# Si la sous-commande "podman compose" n'est pas disponible, installer podman-compose :
+#   podman-compose -f compose.yaml up -d
+#
+# Les identifiants ci-dessous correspondent aux valeurs par defaut attendues par
+# src/main/resources/application.yaml (DB_URL / DB_USERNAME / DB_PASSWORD).
+# En production, surcharger via un fichier .env ou des variables d'environnement
+# et ne JAMAIS committer de mot de passe reel.
+
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    container_name: tontine-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tontine}
+      POSTGRES_USER: ${DB_USERNAME:-tontine}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tontine}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - tontine-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-tontine} -d ${DB_NAME:-tontine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  tontine-pgdata:

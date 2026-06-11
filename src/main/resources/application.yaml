@@ -7,20 +7,13 @@ spring:
       enabled: true
 
   datasource:
-    url: jdbc:h2:mem:tontine;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/tontine}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:tontine}
+    password: ${DB_PASSWORD:tontine}
     hikari:
       maximum-pool-size: 50
       minimum-idle: 10
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-      settings:
-        web-allow-others: false
 
   jpa:
     hibernate:
