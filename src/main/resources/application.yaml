@@ -100,7 +100,7 @@ app:
     expiry-days: 7
   frontend:
     # Base URL de l'app frontend, utilisee pour construire les liens d'acceptation.
-    base-url: ${APP_FRONTEND_BASE_URL:https://app.tontine-connect.cm}
+    base-url: ${APP_FRONTEND_BASE_URL:http://localhost:4200}
   vote:
     # Secret stable servant au hash deterministe des bulletins anonymes
     # (SHA-256(voteId + memberId + secret)). NE JAMAIS changer apres deploiement

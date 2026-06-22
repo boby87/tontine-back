@@ -25,10 +25,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // Endpoint SockJS pour les navigateurs web
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .addInterceptors(new JwtHandshakeInterceptor(jwtService))
                 .withSockJS();
+
+        // Endpoint WebSocket natif pour les applications mobiles (Ionic/Capacitor)
+        registry.addEndpoint("/ws-native")
+                .setAllowedOriginPatterns("*")
+                .addInterceptors(new JwtHandshakeInterceptor(jwtService));
     }
 
     @Override

@@ -7,6 +7,7 @@ import cm.ftg.tontine.auth.dto.LoginRequest;
 import cm.ftg.tontine.auth.dto.OtpVerifyRequest;
 import cm.ftg.tontine.auth.dto.RefreshRequest;
 import cm.ftg.tontine.auth.dto.RegisterRequest;
+import cm.ftg.tontine.auth.dto.ResendOtpRequest;
 import cm.ftg.tontine.auth.dto.ResetPasswordRequest;
 import cm.ftg.tontine.auth.dto.UserDto;
 import cm.ftg.tontine.auth.service.AuthService;
@@ -46,6 +47,11 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<AuthSessionDto> login(@Valid @RequestBody LoginRequest req) {
         return ApiResponse.ok(authService.login(req));
+    }
+
+    @PostMapping("/resend-otp")
+    public ApiResponse<IdentifierResponse> resendOtp(@Valid @RequestBody ResendOtpRequest req) {
+        return ApiResponse.ok(authService.resendOtp(req), "Nouveau code envoye");
     }
 
     @PostMapping("/forgot-password")

@@ -8,6 +8,7 @@ import cm.ftg.tontine.auth.dto.LoginRequest;
 import cm.ftg.tontine.auth.dto.OtpVerifyRequest;
 import cm.ftg.tontine.auth.dto.RefreshRequest;
 import cm.ftg.tontine.auth.dto.RegisterRequest;
+import cm.ftg.tontine.auth.dto.ResendOtpRequest;
 import cm.ftg.tontine.auth.dto.ResetPasswordRequest;
 import cm.ftg.tontine.auth.dto.TokensDto;
 import cm.ftg.tontine.auth.dto.UserDto;
@@ -54,11 +55,23 @@ public class AuthService {
 
     @Transactional
     public IdentifierResponse register(RegisterRequest req) {
-        if (userRepository.existsByEmail(req.email())) {
+        var byEmail = userRepository.findByEmail(req.email().toLowerCase().trim());
+        if (byEmail.isPresent()) {
+            UserEntity existing = byEmail.get();
+            if (!existing.isPhoneVerified() && !existing.isEmailVerified()) {
+                otpService.resend(existing.getPhone(), OtpPurpose.REGISTRATION);
+                return new IdentifierResponse(existing.getPhone());
+            }
             throw new ApiException("AUTH_USER_EXISTS",
                     "Un compte existe deja avec cet email", HttpStatus.CONFLICT);
         }
-        if (userRepository.existsByPhone(req.phone())) {
+        var byPhone = userRepository.findByPhone(req.phone().trim());
+        if (byPhone.isPresent()) {
+            UserEntity existing = byPhone.get();
+            if (!existing.isPhoneVerified() && !existing.isEmailVerified()) {
+                otpService.resend(existing.getPhone(), OtpPurpose.REGISTRATION);
+                return new IdentifierResponse(existing.getPhone());
+            }
             throw new ApiException("AUTH_USER_EXISTS",
                     "Un compte existe deja avec ce telephone", HttpStatus.CONFLICT);
         }
@@ -82,8 +95,9 @@ public class AuthService {
         UserEntity user = userRepository.findByIdentifier(req.identifier())
                 .orElseThrow(() -> new ApiException("AUTH_OTP_INVALID",
                         "Identifiant inconnu", HttpStatus.UNAUTHORIZED));
-        otpService.verifyAndConsume(req.identifier(), req.code(), OtpPurpose.REGISTRATION);
-        if (isEmail(req.identifier())) {
+        String otpIdentifier = resolveOtpIdentifier(user);
+        otpService.verifyAndConsume(otpIdentifier, req.code(), OtpPurpose.REGISTRATION);
+        if (isEmail(otpIdentifier)) {
             user.setEmailVerified(true);
         } else {
             user.setPhoneVerified(true);
@@ -108,11 +122,27 @@ public class AuthService {
                     "Compte desactive", HttpStatus.FORBIDDEN);
         }
         if (!user.isPhoneVerified() && !user.isEmailVerified()) {
-            throw new ApiException("AUTH_PHONE_NOT_VERIFIED",
-                    "Compte non verifie. Validez votre OTP.", HttpStatus.FORBIDDEN);
+            String identifier = user.getPhone() != null ? user.getPhone() : user.getEmail();
+            otpService.resend(identifier, OtpPurpose.REGISTRATION);
+            throw new ApiException("AUTH_ACCOUNT_UNVERIFIED",
+                    "Compte non verifie. Un nouveau code OTP a ete envoye.", HttpStatus.FORBIDDEN);
         }
         auditService.record(user.getId(), "AUTH_LOGIN", "User", user.getId().toString(), null, null);
         return buildSession(user);
+    }
+
+    @Transactional
+    public IdentifierResponse resendOtp(ResendOtpRequest req) {
+        UserEntity user = userRepository.findByIdentifier(req.identifier())
+                .orElseThrow(() -> new ApiException("AUTH_USER_NOT_FOUND",
+                        "Utilisateur introuvable", HttpStatus.NOT_FOUND));
+        if (user.isPhoneVerified() || user.isEmailVerified()) {
+            throw new ApiException("AUTH_ALREADY_VERIFIED",
+                    "Ce compte est deja verifie", HttpStatus.CONFLICT);
+        }
+        String otpIdentifier = resolveOtpIdentifier(user);
+        otpService.resend(otpIdentifier, OtpPurpose.REGISTRATION);
+        return new IdentifierResponse(otpIdentifier);
     }
 
     @Transactional
@@ -201,5 +231,10 @@ public class AuthService {
 
     private boolean isEmail(String identifier) {
         return identifier != null && identifier.contains("@");
+    }
+
+    /** Retourne l'identifiant utilisé lors de l'émission de l'OTP (toujours le téléphone en priorité). */
+    private String resolveOtpIdentifier(UserEntity user) {
+        return user.getPhone() != null ? user.getPhone() : user.getEmail();
     }
 }

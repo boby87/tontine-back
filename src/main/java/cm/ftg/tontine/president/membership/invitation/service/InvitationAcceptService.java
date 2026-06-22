@@ -12,6 +12,9 @@ import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.common.exception.ResourceNotFoundException;
 import cm.ftg.tontine.member.entity.Member;
 import cm.ftg.tontine.member.repository.MemberRepository;
+import cm.ftg.tontine.notification.enums.NotificationCategory;
+import cm.ftg.tontine.notification.enums.NotificationKind;
+import cm.ftg.tontine.notification.service.NotificationService;
 import cm.ftg.tontine.president.membership.invitation.dto.AcceptInvitationRequest;
 import cm.ftg.tontine.president.membership.invitation.dto.AcceptInvitationResponse;
 import cm.ftg.tontine.president.membership.invitation.dto.InvitationPreviewDto;
@@ -24,7 +27,7 @@ import cm.ftg.tontine.tontine.entity.Tontine;
 import cm.ftg.tontine.tontine.repository.TontineRepository;
 import java.time.Instant;
 import java.util.EnumSet;
-import java.util.UUID;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,7 @@ public class InvitationAcceptService {
     private final JwtService jwtService;
     private final AuditService auditService;
     private final RealtimeEventPublisher realtime;
+    private final NotificationService notificationService;
 
     public InvitationAcceptService(MembershipInvitationRepository invitationRepository,
                                    UserRepository userRepository,
@@ -56,7 +60,8 @@ public class InvitationAcceptService {
                                    PasswordEncoder passwordEncoder,
                                    JwtService jwtService,
                                    AuditService auditService,
-                                   RealtimeEventPublisher realtime) {
+                                   RealtimeEventPublisher realtime,
+                                   NotificationService notificationService) {
         this.invitationRepository = invitationRepository;
         this.userRepository = userRepository;
         this.memberRepository = memberRepository;
@@ -65,6 +70,7 @@ public class InvitationAcceptService {
         this.jwtService = jwtService;
         this.auditService = auditService;
         this.realtime = realtime;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -111,6 +117,11 @@ public class InvitationAcceptService {
         UserEntity user = resolveOrCreateUser(inv, req.password());
         Member member = resolveOrCreateMember(inv, user);
 
+        if (user.getActiveTontineId() == null) {
+            user.setActiveTontineId(tontine.getId());
+            user = userRepository.save(user);
+        }
+
         Instant now = Instant.now();
         inv.setStatus(InvitationStatus.ACCEPTED);
         inv.setAcceptedAt(now);
@@ -124,6 +135,18 @@ public class InvitationAcceptService {
                 inv.getId().toString(), tontine.getId(), null);
         realtime.toTontine(tontine.getId(), "invitation.accepted", inv.getId());
         realtime.toTontine(tontine.getId(), "tontine.member-added", member.getId());
+
+        // Notifie le président en in-app : son panneau de notifications se met à jour
+        userRepository.findById(inv.getInvitedByUserId()).ifPresent(president ->
+                notificationService.publish(
+                        president.getId(),
+                        tontine.getId(),
+                        NotificationKind.INFO,
+                        NotificationCategory.INVITATION,
+                        "Invitation acceptée",
+                        inv.getCandidateFullName() + " a accepté votre invitation et a rejoint la tontine \""
+                                + tontine.getName() + "\".",
+                        null));
 
         return new AcceptInvitationResponse(buildSession(user), member.getId(),
                 tontine.getId(), tontine.getName());
@@ -183,6 +206,16 @@ public class InvitationAcceptService {
                 jwtService.generateAccessToken(user),
                 jwtService.generateRefreshToken(user),
                 jwtService.accessTokenTtlSeconds());
-        return new AuthSessionDto(UserDto.from(user), tokens, user.getActiveTontineId());
+        return new AuthSessionDto(UserDto.from(user, aggregateRoles(user)), tokens, user.getActiveTontineId());
+    }
+
+    private Set<UserRole> aggregateRoles(UserEntity user) {
+        EnumSet<UserRole> roles = EnumSet.copyOf(user.getRoles());
+        for (Member m : memberRepository.findByUserId(user.getId())) {
+            if (m.getStatus() == MemberStatus.ACTIVE) {
+                roles.addAll(m.getRoles());
+            }
+        }
+        return roles;
     }
 }

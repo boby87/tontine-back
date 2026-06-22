@@ -21,6 +21,7 @@ public class OtpService {
 
     private static final Logger log = LoggerFactory.getLogger(OtpService.class);
     private static final int MAX_ATTEMPTS = 5;
+    private static final int MAX_RESEND_PER_HOUR = 10;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final OtpCodeRepository repository;
@@ -74,6 +75,22 @@ public class OtpService {
 
     private boolean isEmail(String identifier) {
         return identifier != null && identifier.indexOf('@') > 0;
+    }
+
+    @Transactional
+    public void resend(String identifier, OtpPurpose purpose) {
+        long recent = repository.countByIdentifierAndPurposeSince(
+                identifier, purpose, Instant.now().minusSeconds(3600));
+        if (recent > MAX_RESEND_PER_HOUR) {
+            throw new ApiException("AUTH_OTP_RATE_LIMITED",
+                    "Trop de demandes de code. Reessayez dans une heure.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+        repository.findTopByIdentifierAndPurposeAndConsumedAtIsNullOrderByCreatedAtDesc(identifier, purpose)
+                .ifPresent(otp -> {
+                    otp.setConsumedAt(Instant.now());
+                    repository.save(otp);
+                });
+        issue(identifier, purpose);
     }
 
     @Transactional

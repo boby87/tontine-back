@@ -9,6 +9,9 @@ import cm.ftg.tontine.common.enums.UserRole;
 import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.common.exception.ResourceNotFoundException;
 import cm.ftg.tontine.member.repository.MemberRepository;
+import cm.ftg.tontine.notification.enums.NotificationCategory;
+import cm.ftg.tontine.notification.enums.NotificationKind;
+import cm.ftg.tontine.notification.service.NotificationService;
 import cm.ftg.tontine.president.membership.invitation.dto.CancelInvitationRequest;
 import cm.ftg.tontine.president.membership.invitation.dto.CandidateLookupDto;
 import cm.ftg.tontine.president.membership.invitation.dto.InviteMemberRequest;
@@ -56,6 +59,7 @@ public class InvitationService {
     private final RealtimeEventPublisher realtime;
     private final InvitationTokenGenerator tokenGenerator;
     private final InvitationDispatcher dispatcher;
+    private final NotificationService notificationService;
     private final int expiryDays;
     private final String baseAcceptUrl;
 
@@ -68,6 +72,7 @@ public class InvitationService {
                              RealtimeEventPublisher realtime,
                              InvitationTokenGenerator tokenGenerator,
                              InvitationDispatcher dispatcher,
+                             NotificationService notificationService,
                              @Value("${app.invitation.expiry-days:7}") int expiryDays,
                              @Value("${app.frontend.base-url:https://app.tontine-connect.cm}") String frontendBaseUrl) {
         this.invitationRepository = invitationRepository;
@@ -79,6 +84,7 @@ public class InvitationService {
         this.realtime = realtime;
         this.tokenGenerator = tokenGenerator;
         this.dispatcher = dispatcher;
+        this.notificationService = notificationService;
         this.expiryDays = expiryDays;
         this.baseAcceptUrl = frontendBaseUrl + "/auth";
     }
@@ -258,6 +264,25 @@ public class InvitationService {
                 saved.getId().toString(), tontine.getId(),
                 "{\"phone\":\"" + candidatePhone + "\"}");
         realtime.toTontine(tontine.getId(), "invitation.created", toDto(saved));
+
+        // Notifie le candidat en in-app s'il a déjà un compte.
+        // Normalisation du téléphone : supprime espaces/tirets pour éviter les faux-négatifs
+        // (ex: "+237 600 000 000" vs "+237600000000").
+        final MembershipInvitation finalSaved = saved;
+        String normalizedPhone = candidatePhone == null ? null
+                : candidatePhone.replaceAll("[\\s\\-]", "");
+        userRepository.findByPhone(normalizedPhone).ifPresent(existing ->
+                notificationService.publish(
+                        existing.getId(),
+                        tontine.getId(),
+                        NotificationKind.INFO,
+                        NotificationCategory.INVITATION,
+                        "Invitation à rejoindre une tontine",
+                        invitedByFullName + " vous invite à rejoindre la tontine \""
+                                + tontine.getName() + "\" en tant que "
+                                + roleLabel(proposedRole) + ".",
+                        baseAcceptUrl + "/invitations/" + finalSaved.getToken() + "/accept"));
+
         return saved;
     }
 
@@ -273,6 +298,18 @@ public class InvitationService {
 
     private MembershipInvitationDto toDto(MembershipInvitation inv) {
         return MembershipInvitationDto.from(inv, baseAcceptUrl);
+    }
+
+    private String roleLabel(UserRole role) {
+        return switch (role) {
+            case PRESIDENT -> "Président";
+            case SECRETARY -> "Secrétaire";
+            case TREASURER -> "Trésorier";
+            case CENSOR -> "Censeur";
+            case AUDITOR -> "Commissaire aux comptes";
+            case ADMIN -> "Administrateur";
+            case MEMBER -> "Membre";
+        };
     }
 
     private String fullName(UserEntity u) {

@@ -7,5 +7,6 @@ public enum NotificationCategory {
     SANCTION,
     VOTE,
     VALIDATION,
+    INVITATION,
     GENERAL
 }

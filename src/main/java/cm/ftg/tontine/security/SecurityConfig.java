@@ -1,7 +1,10 @@
 package cm.ftg.tontine.security;
 
+import cm.ftg.tontine.common.dto.ApiError;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +27,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
+
+    private static final ObjectMapper ERROR_MAPPER = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private final JwtAuthenticationFilter jwtFilter;
 
@@ -50,6 +57,7 @@ public class SecurityConfig {
                                 "/auth/forgot-password",
                                 "/auth/reset-password",
                                 "/auth/refresh",
+                                "/auth/resend-otp",
                                 "/auth/invitations/**",
                                 "/error",
                                 "/v3/api-docs/**",
@@ -58,6 +66,8 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/ws/**",
+                                "/ws-native",
+                                "/ws-native/**",
                                 "/webhooks/**"
                         ).permitAll()
                         .anyRequest().authenticated())
@@ -94,14 +104,7 @@ public class SecurityConfig {
                             String message, String path) throws java.io.IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        String body = """
-                {"code":"%s","message":"%s","status":%d,"path":"%s","timestamp":"%s"}"""
-                .formatted(escape(code), escape(message), status.value(), escape(path), Instant.now());
-        response.getWriter().write(body);
-    }
-
-    private static String escape(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        ApiError error = ApiError.of(code, message, status.value(), path);
+        ERROR_MAPPER.writeValue(response.getWriter(), error);
     }
 }
