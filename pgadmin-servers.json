@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Tontine (local)",
+      "Group": "Servers",
+      "Host": "tontine-postgres",
+      "Port": 5432,
+      "MaintenanceDB": "tontine",
+      "Username": "tontine",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}
