@@ -119,7 +119,7 @@ public class SanctionTreasurerService {
 
     private void creditPrincipal(UUID tontineId, BigDecimal amount, CashMovementKind kind,
                                  String description, String reference, String recorderFullName) {
-        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.PRINCIPAL)
+        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.MAIN)
                 .orElseThrow(() -> new ApiException("CASHBOX_NOT_CONFIGURED",
                         "Caisse principale introuvable pour la tontine", HttpStatus.valueOf(422)));
         cashBoxService.credit(principal.getId(), amount, kind, reference, description,
@@ -128,7 +128,7 @@ public class SanctionTreasurerService {
 
     private void debitPrincipal(UUID tontineId, BigDecimal amount, CashMovementKind kind,
                                 String description, String reference, String recorderFullName) {
-        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.PRINCIPAL)
+        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.MAIN)
                 .orElseThrow(() -> new ApiException("CASHBOX_NOT_CONFIGURED",
                         "Caisse principale introuvable pour la tontine", HttpStatus.valueOf(422)));
         cashBoxService.debit(principal.getId(), amount, kind, reference, description,

@@ -11,5 +11,6 @@ public enum CashMovementKind {
     EXPENSE_OUT,
     SANCTION_REFUND_OUT,
     TRANSFER_IN,
-    TRANSFER_OUT
+    TRANSFER_OUT,
+    AUCTION_SACRIFICE
 }

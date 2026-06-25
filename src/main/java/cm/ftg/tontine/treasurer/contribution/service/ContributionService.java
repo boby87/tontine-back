@@ -83,6 +83,20 @@ public class ContributionService {
                     "Cette cotisation est deja reglee", HttpStatus.CONFLICT);
         }
         BigDecimal amount = req.amount();
+        BigDecimal remaining = c.getExpectedAmount().subtract(c.getPaidAmount());
+        if (amount.compareTo(remaining) < 0) {
+            Tontine tontine = tontineRepository.findById(tontineId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Tontine", tontineId));
+            if (!tontine.isPartialContributionAllowed()) {
+                throw new ApiException("PARTIAL_NOT_ALLOWED",
+                        "Les paiements partiels ne sont pas autorises pour cette tontine", HttpStatus.CONFLICT);
+            }
+            BigDecimal minAmount = tontine.getPartialContributionMin();
+            if (minAmount != null && amount.compareTo(minAmount) < 0) {
+                throw new ApiException("PARTIAL_BELOW_MINIMUM",
+                        "Le montant minimum pour un paiement partiel est " + minAmount, HttpStatus.valueOf(422));
+            }
+        }
         c.setPaidAmount(c.getPaidAmount().add(amount));
         if (c.getPaidAmount().compareTo(c.getExpectedAmount()) >= 0) {
             c.setStatus(ContributionStatus.PAID);
@@ -209,7 +223,7 @@ public class ContributionService {
 
     private void creditPrincipal(UUID tontineId, BigDecimal amount, CashMovementKind kind,
                                  String description, String reference, String recorderFullName) {
-        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.PRINCIPAL)
+        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.MAIN)
                 .orElseThrow(() -> new ApiException("CASHBOX_NOT_CONFIGURED",
                         "Caisse principale introuvable pour la tontine", HttpStatus.valueOf(422)));
         cashBoxService.credit(principal.getId(), amount, kind, reference, description,

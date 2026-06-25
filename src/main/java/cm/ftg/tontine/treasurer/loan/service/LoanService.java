@@ -36,17 +36,23 @@ public class LoanService {
     private final CashBoxService cashBoxService;
     private final TreasurerAccessChecker accessChecker;
     private final AuditService auditService;
+    private final GuarantorService guarantorService;
+    private final LoanRepaymentScheduleService scheduleService;
 
     public LoanService(LoanRepository loanRepository,
                        CashBoxRepository cashBoxRepository,
                        CashBoxService cashBoxService,
                        TreasurerAccessChecker accessChecker,
-                       AuditService auditService) {
+                       AuditService auditService,
+                       GuarantorService guarantorService,
+                       LoanRepaymentScheduleService scheduleService) {
         this.loanRepository = loanRepository;
         this.cashBoxRepository = cashBoxRepository;
         this.cashBoxService = cashBoxService;
         this.accessChecker = accessChecker;
         this.auditService = auditService;
+        this.guarantorService = guarantorService;
+        this.scheduleService = scheduleService;
     }
 
     @Transactional(readOnly = true)
@@ -63,7 +69,11 @@ public class LoanService {
         Loan loan = loadInTontine(loanId, tontineId);
         if (loan.getStatus() != LoanStatus.APPROVED) {
             throw new ApiException("LOAN_INVALID_STATE",
-                    "Seul un prêt APPROVED peut être décaissé", HttpStatus.CONFLICT);
+                    "Seul un pret APPROVED peut etre decaisse", HttpStatus.CONFLICT);
+        }
+        if (!guarantorService.areAllAccepted(loanId)) {
+            throw new ApiException("GUARANTORS_PENDING",
+                    "Tous les garants doivent avoir accepte avant le decaissement", HttpStatus.CONFLICT);
         }
         loan.setStatus(LoanStatus.DISBURSED);
         loan.setDisbursedAt(Instant.now());
@@ -73,6 +83,8 @@ public class LoanService {
                 "Decaissement pret #" + saved.getId() + " membre " + saved.getMemberId(),
                 saved.getId().toString(),
                 fullName(treasurer));
+
+        scheduleService.generateSchedule(saved);
 
         auditService.record(userId, "LOAN_DISBURSE", "Loan", saved.getId().toString(),
                 tontineId, "{\"amount\":\"***\"}");
@@ -100,6 +112,8 @@ public class LoanService {
                 saved.getId().toString(),
                 fullName(treasurer));
 
+        scheduleService.applyPayment(saved.getId(), req.amount());
+
         auditService.record(userId, "LOAN_REPAY", "Loan", saved.getId().toString(),
                 tontineId, "{\"amount\":\"***\"}");
         return LoanDto.from(saved);
@@ -107,7 +121,7 @@ public class LoanService {
 
     @Transactional
     public Loan createPending(UUID tontineId, UUID memberId, BigDecimal principal, BigDecimal annualRatePct,
-                              int durationMonths, String purpose, List<UUID> guarantorIds) {
+                              int durationMonths, String purpose, List<UUID> guarantorMemberIds) {
         Loan loan = new Loan();
         loan.setTontineId(tontineId);
         loan.setMemberId(memberId);
@@ -115,9 +129,6 @@ public class LoanService {
         loan.setInterestRate(annualRatePct == null ? BigDecimal.ZERO : annualRatePct);
         loan.setDurationMonths(durationMonths);
         loan.setPurpose(purpose);
-        if (guarantorIds != null) {
-            loan.getGuarantorIds().addAll(guarantorIds);
-        }
         BigDecimal totalDue = computeTotalDue(loan.getPrincipal(), loan.getInterestRate(), durationMonths);
         loan.setTotalDue(totalDue);
         if (durationMonths > 0) {
@@ -125,8 +136,10 @@ public class LoanService {
         } else {
             loan.setMonthlyPayment(totalDue);
         }
-        loan.setStatus(LoanStatus.REQUESTED);
-        return loanRepository.save(loan);
+        loan.setStatus(LoanStatus.PENDING);
+        Loan saved = loanRepository.save(loan);
+        guarantorService.addGuarantors(saved.getId(), guarantorMemberIds);
+        return saved;
     }
 
     private BigDecimal computeTotalDue(BigDecimal principal, BigDecimal annualRatePct, int durationMonths) {
@@ -152,7 +165,7 @@ public class LoanService {
 
     private void creditPrincipal(UUID tontineId, BigDecimal amount, CashMovementKind kind,
                                  String description, String reference, String recorderFullName) {
-        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.PRINCIPAL)
+        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.MAIN)
                 .orElseThrow(() -> new ApiException("CASHBOX_NOT_CONFIGURED",
                         "Caisse principale introuvable pour la tontine", HttpStatus.valueOf(422)));
         cashBoxService.credit(principal.getId(), amount, kind, reference, description,
@@ -161,7 +174,7 @@ public class LoanService {
 
     private void debitPrincipal(UUID tontineId, BigDecimal amount, CashMovementKind kind,
                                 String description, String reference, String recorderFullName) {
-        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.PRINCIPAL)
+        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.MAIN)
                 .orElseThrow(() -> new ApiException("CASHBOX_NOT_CONFIGURED",
                         "Caisse principale introuvable pour la tontine", HttpStatus.valueOf(422)));
         cashBoxService.debit(principal.getId(), amount, kind, reference, description,

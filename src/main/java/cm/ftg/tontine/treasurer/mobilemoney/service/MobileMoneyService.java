@@ -86,7 +86,7 @@ public class MobileMoneyService {
         }
         repository.save(tx);
 
-        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.PRINCIPAL)
+        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.MAIN)
                 .orElseThrow(() -> new ApiException("CASHBOX_PRINCIPAL_MISSING",
                         "Caisse principale introuvable", HttpStatus.valueOf(422)));
 

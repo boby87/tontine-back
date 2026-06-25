@@ -1,5 +1,14 @@
 # Copilot Instructions — Projet Tontine
 
+## Décisions d'architecture (actées — ne pas modifier sans discussion)
+
+| Sujet | Decision | Raison |
+| --- | --- | --- |
+| Package racine | `cm.ftg.tontine` (ne pas renommer) | Cout migration trop eleve, coherence codebase |
+| Type montants | `BigDecimal` (precision 19, scale 2) | Securite financiere, compatibilite codebase |
+| Tests | Groovy + Spock Framework (pas JUnit 5) | Decision actee — tous les tests en Groovy uniquement |
+| UI frontend | Tailwind CSS (pas Angular Material) | Deja en place, CLAUDE.md projet |
+
 ## Contexte du projet
 
 Application de gestion de tontines développée avec **Spring Boot 4.0.5** et **Java 21**.
@@ -69,69 +78,65 @@ Package racine : `cm.ftg.tontine`. Build : Maven.
 
 
 
-## 3. Tests unitaires — Structure JUnit 5
+## 3. Tests unitaires — Spock Framework (Groovy)
+
+> Tous les tests sont écrits en **Groovy uniquement**. Pas de fichiers `.java` dans `src/test/`.
+> Répertoire : `src/test/groovy/cm/ftg/tontine/`
 
 ### Convention de nommage
 
-- Classe de test : `{ClasseTestée}Test.java` (ex : `CotisationServiceTest.java`).
-- Méthode de test : `should_<résultat attendu>_when_<condition>` (ex : `should_throwException_when_amountIsNegative`).
+- Fichier : `{ClasseTestée}Spec.groovy` (ex : `CotisationServiceSpec.groovy`).
+- Labels Spock : `given:` / `when:` / `then:` / `and:` / `expect:` / `where:`.
 
-### Structure d'un test (pattern AAA)
+### Structure d'une spec (pattern given/when/then)
 
-```java
-@Test
-@DisplayName("Doit rejeter une cotisation avec un montant négatif")
-void should_throwException_when_amountIsNegative() {
-    // Arrange
-    var request = new CotisationRequest(membreId, BigDecimal.valueOf(-100));
+```groovy
+class CotisationServiceSpec extends Specification {
 
-    // Act & Assert
-    assertThatThrownBy(() -> cotisationService.enregistrer(request))
-        .isInstanceOf(MontantInvalideException.class)
-        .hasMessageContaining("montant");
+    CotisationRepository repository = Mock()
+    CotisationService service = new CotisationService(repository)
+
+    def "doit rejeter une cotisation avec un montant negatif"() {
+        given:
+        def request = new CotisationRequest(membreId, BigDecimal.valueOf(-100))
+
+        when:
+        service.enregistrer(request)
+
+        then:
+        thrown(MontantInvalideException)
+    }
 }
 ```
 
-### Organisation
+### Mocking
 
-- Utiliser `@Nested` pour regrouper les tests par scénario ou méthode testée :
-  ```java
-  class CotisationServiceTest {
-
-      @Nested
-      @DisplayName("enregistrer()")
-      class Enregistrer {
-
-          @Test void should_persist_when_validRequest() { ... }
-          @Test void should_throwException_when_amountIsNegative() { ... }
-      }
-
-      @Nested
-      @DisplayName("calculerTotal()")
-      class CalculerTotal { ... }
-  }
-  ```
-
-### Mocking & Assertions
-
-- Utiliser **Mockito** (`@ExtendWith(MockitoExtension.class)`) pour isoler la couche service des dépendances (repositories, clients externes).
-- Ne jamais mocker la classe sous test.
-- Préférer **AssertJ** (`assertThat(...)`) aux assertions JUnit natives pour la lisibilité.
-- Pour les montants financiers, comparer avec `isEqualByComparingTo()` (ignore la scale de `BigDecimal`).
+- Utiliser les mocks natifs Spock : `Mock()`, `Stub()`, `Spy()` — pas Mockito.
+- Vérifier les interactions avec `1 * repository.save(_)` dans le bloc `then:`.
+- Capturer les arguments avec `1 * repository.save({ it.montant == expected })`.
 
 ### Tests paramétrés
 
-- Utiliser `@ParameterizedTest` avec `@CsvSource` ou `@MethodSource` pour les cas limites financiers :
-  ```java
-  @ParameterizedTest
-  @CsvSource({"0, false", "100, true", "-1, false", "999999999, true"})
-  void should_validateAmount(BigDecimal amount, boolean expected) {
-      assertThat(validator.isValid(amount)).isEqualTo(expected);
-  }
-  ```
+```groovy
+def "doit valider le montant"() {
+    expect:
+    service.isValid(montant) == resultat
+
+    where:
+    montant                    || resultat
+    BigDecimal.ZERO            || false
+    BigDecimal.valueOf(100)    || true
+    BigDecimal.valueOf(-1)     || false
+    BigDecimal.valueOf(999999) || true
+}
+```
+
+### Montants BigDecimal
+
+- Comparer avec `==` en Groovy (appelle `equals`) ou `montant.compareTo(expected) == 0` pour ignorer la scale.
 
 ### Couverture
 
-- Viser **≥ 80 %** de couverture sur les services métier (calcul de parts, distributions, cotisations).
-- Les contrôleurs REST se testent avec `@WebMvcTest` et `MockMvc` — pas de tests unitaires purs.
+- Viser **≥ 80 %** sur les services métier (calcul de parts, distributions, cotisations).
+- Les contrôleurs se testent avec `@WebMvcTest` + `MockMvc` via Spock (`def mockMvc = MockMvcBuilders...`).
 - Ne pas tester les getters/setters, les entités JPA sans logique, ni le code auto-généré.

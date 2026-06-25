@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
 
-    public enum TokenType { ACCESS, REFRESH }
+    public enum TokenType { ACCESS, REFRESH, TOTP_PENDING }
 
     private final JwtProperties properties;
     private final SecretKey signingKey;
@@ -42,6 +42,11 @@ public class JwtService {
 
     public long accessTokenTtlSeconds() {
         return properties.accessTokenTtlSeconds();
+    }
+
+    /** Token de courte durée (5 min) émis quand la 2FA TOTP est requise après le login. */
+    public String generateTotpPendingToken(UserEntity user) {
+        return generate(user, TokenType.TOTP_PENDING, 30000L);
     }
 
     private String generate(UserEntity user, TokenType type, long ttlSeconds) {

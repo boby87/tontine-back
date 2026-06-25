@@ -30,7 +30,7 @@ public record LoanDto(
         return new LoanDto(
                 l.getId(), l.getTontineId(), l.getMemberId(), l.getPrincipal(), l.getInterestRate(),
                 l.getDurationMonths(), l.getMonthlyPayment(), l.getTotalDue(), l.getTotalRepaid(),
-                l.getStatus(), l.getPurpose(), List.copyOf(l.getGuarantorIds()),
+                l.getStatus(), l.getPurpose(), List.of(),
                 l.getRequestedAt(), l.getApprovedAt(), l.getDisbursedAt(), l.getDueDate());
     }
 }

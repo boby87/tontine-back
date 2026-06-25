@@ -68,4 +68,9 @@ public class NotificationController {
         service.delete(id, user.id());
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/read-all")
+    public ApiResponse<ReadAllResult> deleteAllRead(@AuthenticationPrincipal AuthenticatedUser user) {
+        return ApiResponse.ok(new ReadAllResult(service.deleteAllRead(user.id())));
+    }
 }

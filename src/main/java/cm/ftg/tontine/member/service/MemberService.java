@@ -44,7 +44,7 @@ public class MemberService {
                 member.getTotalArrears(),
                 0,                  // activeLoans — module Prets non encore implemente
                 null,               // nextSession — module Sessions non encore implemente
-                member.getTourOrder(),
+                member.getRotationOrder(),
                 member.getTontineId());
     }
 

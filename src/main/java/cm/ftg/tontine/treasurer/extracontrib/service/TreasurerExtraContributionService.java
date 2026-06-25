@@ -85,7 +85,7 @@ public class TreasurerExtraContributionService {
         extra.setTotalCollected(extra.getTotalCollected().add(req.amount()));
         ExtraordinaryContribution saved = repository.save(extra);
 
-        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.PRINCIPAL)
+        CashBox principal = cashBoxRepository.findByTontineIdAndType(tontineId, CashBoxType.MAIN)
                 .orElseThrow(() -> new ApiException("CASHBOX_PRINCIPAL_MISSING",
                         "Caisse principale introuvable", HttpStatus.valueOf(422)));
 

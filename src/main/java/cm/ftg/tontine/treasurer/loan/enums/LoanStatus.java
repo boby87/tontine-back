@@ -1,7 +1,7 @@
 package cm.ftg.tontine.treasurer.loan.enums;
 
 public enum LoanStatus {
-    REQUESTED,
+    PENDING,
     GUARANTOR_PENDING,
     GUARANTOR_APPROVED,
     COMMITTEE_REVIEW,

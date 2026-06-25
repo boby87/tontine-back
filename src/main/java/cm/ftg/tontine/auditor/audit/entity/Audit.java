@@ -21,7 +21,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(name = "audits", indexes = {
-        @Index(name = "idx_audit_tontine", columnList = "tontine_id")
+        @Index(name = "idx_audits_tontine", columnList = "tontine_id")
 })
 @Getter
 @Setter

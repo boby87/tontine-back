@@ -38,7 +38,7 @@ public record UserDto(
                 u.getLastName(),
                 u.getEmail(),
                 u.getPhone(),
-                u.getAvatarUrl(),
+                u.getProfilePhotoUrl(),
                 aggregatedRoles,
                 u.isActive(),
                 u.isPhoneVerified(),

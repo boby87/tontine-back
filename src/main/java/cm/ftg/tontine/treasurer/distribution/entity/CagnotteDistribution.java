@@ -1,5 +1,6 @@
 package cm.ftg.tontine.treasurer.distribution.entity;
 
+import cm.ftg.tontine.common.enums.DistributionMode;
 import cm.ftg.tontine.treasurer.common.enums.PaymentMethod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -62,6 +63,16 @@ public class CagnotteDistribution {
 
     @Column(name = "net_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal netAmount;
+
+    @Column(name = "cycle_id")
+    private UUID cycleId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "distribution_mode", nullable = false, length = 20)
+    private DistributionMode distributionMode = DistributionMode.ROTATION;
+
+    @Column(name = "auction_sacrifice_amount", precision = 19, scale = 2)
+    private BigDecimal auctionSacrificeAmount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 30)

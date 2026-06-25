@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class InvitationService {
 
+    private static final Logger log = LoggerFactory.getLogger(InvitationService.class);
     private static final HttpStatus UNPROCESSABLE = HttpStatus.valueOf(422);
     private static final Set<TontineStatus> INVITABLE_TONTINE = Set.of(
             TontineStatus.DRAFT, TontineStatus.ACTIVE);
@@ -197,6 +200,26 @@ public class InvitationService {
         auditService.record(userId, "INVITATION_RESEND", "MembershipInvitation",
                 saved.getId().toString(), tontineId, null);
         realtime.toTontine(tontineId, "invitation.resent", toDto(saved));
+
+        String normalizedPhone = saved.getCandidatePhone() == null ? null
+                : saved.getCandidatePhone().replaceAll("[\\s\\-]", "");
+        userRepository.findByPhone(normalizedPhone).ifPresent(existing -> {
+            try {
+                notificationService.publish(
+                        existing.getId(),
+                        tontineId,
+                        NotificationKind.INFO,
+                        NotificationCategory.INVITATION,
+                        "Rappel : invitation à rejoindre une tontine",
+                        saved.getInvitedByFullName() + " vous relance pour rejoindre la tontine \""
+                                + tontine.getName() + "\" en tant que "
+                                + roleLabel(saved.getProposedRole()) + ".",
+                        baseAcceptUrl + "/invitations/" + saved.getToken() + "/accept");
+            } catch (Exception e) {
+                log.warn("[INVITATION_RESEND] Notification in-app échouée pour userId={}", existing.getId(), e);
+            }
+        });
+
         return toDto(saved);
     }
 
@@ -271,17 +294,22 @@ public class InvitationService {
         final MembershipInvitation finalSaved = saved;
         String normalizedPhone = candidatePhone == null ? null
                 : candidatePhone.replaceAll("[\\s\\-]", "");
-        userRepository.findByPhone(normalizedPhone).ifPresent(existing ->
-                notificationService.publish(
-                        existing.getId(),
-                        tontine.getId(),
-                        NotificationKind.INFO,
-                        NotificationCategory.INVITATION,
-                        "Invitation à rejoindre une tontine",
-                        invitedByFullName + " vous invite à rejoindre la tontine \""
-                                + tontine.getName() + "\" en tant que "
-                                + roleLabel(proposedRole) + ".",
-                        baseAcceptUrl + "/invitations/" + finalSaved.getToken() + "/accept"));
+        log.info("[INVITATION] Recherche utilisateur par téléphone normalisé: '{}'", normalizedPhone);
+        userRepository.findByPhone(normalizedPhone).ifPresentOrElse(
+                existing -> {
+                    log.info("[INVITATION] Utilisateur trouvé: id={}, statut={}. Envoi notification in-app.", existing.getId(), existing.getStatus());
+                    notificationService.publish(
+                            existing.getId(),
+                            tontine.getId(),
+                            NotificationKind.INFO,
+                            NotificationCategory.INVITATION,
+                            "Invitation à rejoindre une tontine",
+                            invitedByFullName + " vous invite à rejoindre la tontine \""
+                                    + tontine.getName() + "\" en tant que "
+                                    + roleLabel(proposedRole) + ".",
+                            baseAcceptUrl + "/invitations/" + finalSaved.getToken() + "/accept");
+                },
+                () -> log.warn("[INVITATION] Aucun utilisateur avec le téléphone '{}' → notification in-app ignorée.", normalizedPhone));
 
         return saved;
     }
@@ -303,8 +331,11 @@ public class InvitationService {
     private String roleLabel(UserRole role) {
         return switch (role) {
             case PRESIDENT -> "Président";
+            case VICE_PRESIDENT -> "Vice-Président";
             case SECRETARY -> "Secrétaire";
+            case SECRETARY_ADJOINT -> "Secrétaire Adjoint";
             case TREASURER -> "Trésorier";
+            case TREASURER_ADJOINT -> "Trésorier Adjoint";
             case CENSOR -> "Censeur";
             case AUDITOR -> "Commissaire aux comptes";
             case ADMIN -> "Administrateur";

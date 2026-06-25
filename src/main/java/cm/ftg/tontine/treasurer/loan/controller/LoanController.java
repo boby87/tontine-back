@@ -5,7 +5,9 @@ import cm.ftg.tontine.president.common.TontineIdResolver;
 import cm.ftg.tontine.security.AuthenticatedUser;
 import cm.ftg.tontine.treasurer.loan.dto.DisburseLoanRequest;
 import cm.ftg.tontine.treasurer.loan.dto.LoanDto;
+import cm.ftg.tontine.treasurer.loan.dto.LoanRepaymentScheduleDto;
 import cm.ftg.tontine.treasurer.loan.dto.RepayLoanRequest;
+import cm.ftg.tontine.treasurer.loan.service.LoanRepaymentScheduleService;
 import cm.ftg.tontine.treasurer.loan.service.LoanService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -24,10 +26,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class LoanController {
 
     private final LoanService service;
+    private final LoanRepaymentScheduleService scheduleService;
     private final TontineIdResolver tontineIdResolver;
 
-    public LoanController(LoanService service, TontineIdResolver tontineIdResolver) {
+    public LoanController(LoanService service,
+                          LoanRepaymentScheduleService scheduleService,
+                          TontineIdResolver tontineIdResolver) {
         this.service = service;
+        this.scheduleService = scheduleService;
         this.tontineIdResolver = tontineIdResolver;
     }
 
@@ -48,6 +54,15 @@ public class LoanController {
         UUID t = tontineIdResolver.resolve(user.id(), tontineId);
         return ApiResponse.ok(service.disburse(id, t, user.id(),
                 req == null ? new DisburseLoanRequest(null) : req), "Pret decaisse");
+    }
+
+    @GetMapping("/{id}/schedule")
+    public ApiResponse<List<LoanRepaymentScheduleDto>> schedule(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(scheduleService.listByLoan(id, t, user.id()));
     }
 
     @PostMapping("/{id}/repay")

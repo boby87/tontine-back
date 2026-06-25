@@ -3,5 +3,6 @@ package cm.ftg.tontine.common.enums;
 public enum OtpPurpose {
     REGISTRATION,
     PASSWORD_RESET,
-    LOGIN_2FA
+    LOGIN_2FA,
+    CAGNOTTE_DISTRIBUTION
 }

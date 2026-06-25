@@ -122,8 +122,11 @@ public class InvitationDispatcher {
     private String roleLabel(UserRole role) {
         return switch (role) {
             case PRESIDENT -> "President";
+            case VICE_PRESIDENT -> "Vice-President";
             case SECRETARY -> "Secretaire";
+            case SECRETARY_ADJOINT -> "Secretaire Adjoint";
             case TREASURER -> "Tresorier";
+            case TREASURER_ADJOINT -> "Tresorier Adjoint";
             case CENSOR -> "Censeur";
             case AUDITOR -> "Commissaire aux comptes";
             case ADMIN -> "Administrateur";

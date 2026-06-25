@@ -127,4 +127,4 @@ app:
 logging:
   level:
     org.hibernate.SQL: INFO
-    cm.ftg.tontine: DEBUG
+    cm.ftg.tontine: INFO

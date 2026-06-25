@@ -1,23 +1,17 @@
 package cm.ftg.tontine.treasurer.loan.entity;
 
 import cm.ftg.tontine.treasurer.loan.enums.LoanStatus;
-import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -66,15 +60,10 @@ public class Loan {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private LoanStatus status = LoanStatus.REQUESTED;
+    private LoanStatus status = LoanStatus.PENDING;
 
     @Column(length = 1000)
     private String purpose;
-
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "loan_guarantors", joinColumns = @JoinColumn(name = "loan_id"))
-    @Column(name = "guarantor_id", nullable = false)
-    private List<UUID> guarantorIds = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "requested_at", updatable = false, nullable = false)

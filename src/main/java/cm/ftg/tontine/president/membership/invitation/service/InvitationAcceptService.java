@@ -8,6 +8,7 @@ import cm.ftg.tontine.auth.entity.UserEntity;
 import cm.ftg.tontine.auth.repository.UserRepository;
 import cm.ftg.tontine.common.enums.MemberStatus;
 import cm.ftg.tontine.common.enums.UserRole;
+import cm.ftg.tontine.common.enums.UserStatus;
 import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.common.exception.ResourceNotFoundException;
 import cm.ftg.tontine.member.entity.Member;
@@ -168,7 +169,7 @@ public class InvitationAcceptService {
         u.setPhone(inv.getCandidatePhone());
         u.setPasswordHash(passwordEncoder.encode(rawPassword));
         u.setRoles(EnumSet.of(UserRole.MEMBER));
-        u.setActive(true);
+        u.setStatus(UserStatus.ACTIVE);
         // Cliquer sur le lien recu par SMS vaut verification du telephone.
         u.setPhoneVerified(true);
         u.setEmailVerified(inv.getCandidateEmail() != null && !inv.getCandidateEmail().isBlank());

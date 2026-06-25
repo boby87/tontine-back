@@ -21,7 +21,7 @@ public record MemberDto(
         MemberStatus status,
         Set<UserRole> roles,
         Instant joinedAt,
-        Integer tourOrder,
+        Integer rotationOrder,
         boolean hasReceivedTour,
         BigDecimal totalContributed,
         BigDecimal totalArrears
@@ -41,7 +41,7 @@ public record MemberDto(
                 m.getStatus(),
                 m.getRoles(),
                 m.getJoinedAt(),
-                m.getTourOrder(),
+                m.getRotationOrder(),
                 m.isHasReceivedTour(),
                 m.getTotalContributed(),
                 m.getTotalArrears());

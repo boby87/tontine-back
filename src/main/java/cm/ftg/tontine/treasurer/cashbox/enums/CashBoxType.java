@@ -1,7 +1,7 @@
 package cm.ftg.tontine.treasurer.cashbox.enums;
 
 public enum CashBoxType {
-    PRINCIPAL,
+    MAIN,
     EMERGENCY,
     OPERATIONS,
     OTHER

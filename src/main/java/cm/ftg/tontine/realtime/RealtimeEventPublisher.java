@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.user.SimpUser;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,16 +16,34 @@ public class RealtimeEventPublisher {
     private static final Logger log = LoggerFactory.getLogger(RealtimeEventPublisher.class);
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final SimpUserRegistry userRegistry;
 
-    public RealtimeEventPublisher(SimpMessagingTemplate messagingTemplate) {
+    public RealtimeEventPublisher(SimpMessagingTemplate messagingTemplate,
+                                  SimpUserRegistry userRegistry) {
         this.messagingTemplate = messagingTemplate;
+        this.userRegistry = userRegistry;
     }
 
+    /**
+     * Envoie un événement à toutes les sessions actives d'un utilisateur.
+     *
+     * Bypasse convertAndSendToUser : ce dernier envoie au brokerChannel sous
+     * /user/{userId}/queue/... alors que les abonnements sont enregistrés sous
+     * /user/{sessionId}/queue/... (après traduction par UserDestinationMessageHandler).
+     * En construisant la destination session-spécifique directement, on garantit
+     * la correspondance avec l'abonnement du broker.
+     */
     public void toUser(UUID userId, String queue, String eventType, Object payload) {
         if (userId == null) {
             return;
         }
-        safeSendToUser(userId.toString(), queue, RealtimeEvent.of(eventType, payload));
+        SimpUser user = userRegistry.getUser(userId.toString());
+        if (user == null || user.getSessions().isEmpty()) {
+            log.debug("[WS] toUser: userId={} non connecté — message ignoré", userId);
+            return;
+        }
+        RealtimeEvent event = RealtimeEvent.of(eventType, payload);
+        messagingTemplate.convertAndSendToUser(userId.toString(), queue, event);
     }
 
     public void toSession(UUID tontineId, UUID sessionId, String eventType, Object payload) {
@@ -63,11 +83,4 @@ public class RealtimeEventPublisher {
         }
     }
 
-    private void safeSendToUser(String userId, String destination, RealtimeEvent event) {
-        try {
-            messagingTemplate.convertAndSendToUser(userId, destination, event);
-        } catch (MessagingException ex) {
-            log.warn("WebSocket user-broadcast failed (user={}, dest={}): {}", userId, destination, ex.getMessage());
-        }
-    }
 }

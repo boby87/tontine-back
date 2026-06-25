@@ -30,6 +30,14 @@ public class AgendaDraftController {
         this.tontineIdResolver = tontineIdResolver;
     }
 
+    @GetMapping("/next-session-number")
+    public ApiResponse<Integer> nextSessionNumber(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.nextSessionNumber(t, user.id()));
+    }
+
     @GetMapping
     public ApiResponse<List<AgendaDraftDto>> list(
             @AuthenticationPrincipal AuthenticatedUser user,

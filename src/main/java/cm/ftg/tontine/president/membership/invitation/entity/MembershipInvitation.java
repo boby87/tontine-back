@@ -99,6 +99,22 @@ public class MembershipInvitation {
     @Column(name = "reminders_sent", nullable = false)
     private int remindersSent = 0;
 
+    /** null = usage illimité. */
+    @Column(name = "max_uses")
+    private Integer maxUses;
+
+    @Column(name = "used_count", nullable = false)
+    private int usedCount = 0;
+
+    @Column(name = "is_revoked", nullable = false)
+    private boolean isRevoked = false;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
+    @Column(name = "revoked_by_user_id")
+    private UUID revokedByUserId;
+
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
@@ -110,4 +126,8 @@ public class MembershipInvitation {
 
     @Version
     private Long version;
+
+    public boolean isMaxUsesReached() {
+        return maxUses != null && usedCount >= maxUses;
+    }
 }

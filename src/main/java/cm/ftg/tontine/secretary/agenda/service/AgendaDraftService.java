@@ -44,6 +44,12 @@ public class AgendaDraftService {
     }
 
     @Transactional(readOnly = true)
+    public int nextSessionNumber(UUID tontineId, UUID userId) {
+        accessChecker.requireSecretary(userId, tontineId);
+        return draftRepository.findNextSessionNumber(tontineId);
+    }
+
+    @Transactional(readOnly = true)
     public List<AgendaDraftDto> list(UUID tontineId, UUID userId) {
         accessChecker.requireSecretary(userId, tontineId);
         return draftRepository.findByTontineIdOrderByCreatedAtDesc(tontineId).stream()

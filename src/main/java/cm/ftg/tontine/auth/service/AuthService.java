@@ -5,11 +5,16 @@ import cm.ftg.tontine.auth.dto.AuthSessionDto;
 import cm.ftg.tontine.auth.dto.ForgotPasswordRequest;
 import cm.ftg.tontine.auth.dto.IdentifierResponse;
 import cm.ftg.tontine.auth.dto.LoginRequest;
+import cm.ftg.tontine.auth.dto.LoginResult;
 import cm.ftg.tontine.auth.dto.OtpVerifyRequest;
 import cm.ftg.tontine.auth.dto.RefreshRequest;
 import cm.ftg.tontine.auth.dto.RegisterRequest;
 import cm.ftg.tontine.auth.dto.ResendOtpRequest;
 import cm.ftg.tontine.auth.dto.ResetPasswordRequest;
+import cm.ftg.tontine.auth.dto.TotpChallengeDto;
+import cm.ftg.tontine.auth.dto.TotpConfirmRequest;
+import cm.ftg.tontine.auth.dto.TotpSetupDto;
+import cm.ftg.tontine.auth.dto.TotpVerifyLoginRequest;
 import cm.ftg.tontine.auth.dto.TokensDto;
 import cm.ftg.tontine.auth.dto.UserDto;
 import cm.ftg.tontine.auth.entity.UserEntity;
@@ -17,10 +22,12 @@ import cm.ftg.tontine.auth.repository.UserRepository;
 import cm.ftg.tontine.common.enums.MemberStatus;
 import cm.ftg.tontine.common.enums.OtpPurpose;
 import cm.ftg.tontine.common.enums.UserRole;
+import cm.ftg.tontine.common.enums.UserStatus;
 import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.member.entity.Member;
 import cm.ftg.tontine.member.repository.MemberRepository;
 import cm.ftg.tontine.security.JwtService;
+import java.util.Base64;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
@@ -32,11 +39,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
+    private static final String TOTP_ISSUER = "TontineApp";
+
     private final UserRepository userRepository;
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
     private final JwtService jwtService;
+    private final TotpService totpService;
     private final AuditService auditService;
 
     public AuthService(UserRepository userRepository,
@@ -44,12 +54,14 @@ public class AuthService {
                        PasswordEncoder passwordEncoder,
                        OtpService otpService,
                        JwtService jwtService,
+                       TotpService totpService,
                        AuditService auditService) {
         this.userRepository = userRepository;
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.otpService = otpService;
         this.jwtService = jwtService;
+        this.totpService = totpService;
         this.auditService = auditService;
     }
 
@@ -58,7 +70,7 @@ public class AuthService {
         var byEmail = userRepository.findByEmail(req.email().toLowerCase().trim());
         if (byEmail.isPresent()) {
             UserEntity existing = byEmail.get();
-            if (!existing.isPhoneVerified() && !existing.isEmailVerified()) {
+            if (existing.getStatus() == UserStatus.PENDING_VERIFICATION) {
                 otpService.resend(existing.getPhone(), OtpPurpose.REGISTRATION);
                 return new IdentifierResponse(existing.getPhone());
             }
@@ -68,7 +80,7 @@ public class AuthService {
         var byPhone = userRepository.findByPhone(req.phone().trim());
         if (byPhone.isPresent()) {
             UserEntity existing = byPhone.get();
-            if (!existing.isPhoneVerified() && !existing.isEmailVerified()) {
+            if (existing.getStatus() == UserStatus.PENDING_VERIFICATION) {
                 otpService.resend(existing.getPhone(), OtpPurpose.REGISTRATION);
                 return new IdentifierResponse(existing.getPhone());
             }
@@ -82,7 +94,7 @@ public class AuthService {
         u.setPhone(req.phone().trim());
         u.setPasswordHash(passwordEncoder.encode(req.password()));
         u.setRoles(EnumSet.of(UserRole.MEMBER));
-        u.setActive(true);
+        u.setStatus(UserStatus.PENDING_VERIFICATION);
         UserEntity saved = userRepository.save(u);
         otpService.issue(saved.getPhone(), OtpPurpose.REGISTRATION);
         auditService.record(saved.getId(), "AUTH_REGISTER", "User", saved.getId().toString(),
@@ -97,11 +109,7 @@ public class AuthService {
                         "Identifiant inconnu", HttpStatus.UNAUTHORIZED));
         String otpIdentifier = resolveOtpIdentifier(user);
         otpService.verifyAndConsume(otpIdentifier, req.code(), OtpPurpose.REGISTRATION);
-        if (isEmail(otpIdentifier)) {
-            user.setEmailVerified(true);
-        } else {
-            user.setPhoneVerified(true);
-        }
+        user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
         auditService.record(user.getId(), "AUTH_OTP_VERIFIED", "User", user.getId().toString(),
                 null, null);
@@ -109,7 +117,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthSessionDto login(LoginRequest req) {
+    public LoginResult login(LoginRequest req) {
         UserEntity user = userRepository.findByIdentifier(req.identifier())
                 .orElseThrow(() -> new ApiException("AUTH_INVALID_CREDENTIALS",
                         "Identifiant ou mot de passe incorrect", HttpStatus.UNAUTHORIZED));
@@ -118,17 +126,115 @@ public class AuthService {
                     "Identifiant ou mot de passe incorrect", HttpStatus.UNAUTHORIZED);
         }
         if (!user.isActive()) {
-            throw new ApiException("AUTH_ACCOUNT_DISABLED",
-                    "Compte desactive", HttpStatus.FORBIDDEN);
+            if (user.getStatus() == UserStatus.PENDING_VERIFICATION) {
+                String identifier = user.getPhone() != null ? user.getPhone() : user.getEmail();
+                otpService.resend(identifier, OtpPurpose.REGISTRATION);
+                throw new ApiException("AUTH_ACCOUNT_UNVERIFIED",
+                        "Compte non verifie. Un nouveau code OTP a ete envoye.", HttpStatus.FORBIDDEN);
+            }
+            throw new ApiException("AUTH_ACCOUNT_DISABLED", "Compte desactive", HttpStatus.FORBIDDEN);
         }
-        if (!user.isPhoneVerified() && !user.isEmailVerified()) {
-            String identifier = user.getPhone() != null ? user.getPhone() : user.getEmail();
-            otpService.resend(identifier, OtpPurpose.REGISTRATION);
-            throw new ApiException("AUTH_ACCOUNT_UNVERIFIED",
-                    "Compte non verifie. Un nouveau code OTP a ete envoye.", HttpStatus.FORBIDDEN);
+        if (user.isTotpEnabled()) {
+            String pendingToken = jwtService.generateTotpPendingToken(user);
+            try {
+                auditService.record(user.getId(), "AUTH_TOTP_CHALLENGE", "User",
+                        user.getId().toString(), null, null);
+            } catch (Exception ignored) {
+            }
+            return new LoginResult.TotpRequired(TotpChallengeDto.of(pendingToken));
         }
         auditService.record(user.getId(), "AUTH_LOGIN", "User", user.getId().toString(), null, null);
+        return new LoginResult.Authenticated(buildSession(user));
+    }
+
+    @Transactional
+    public AuthSessionDto verifyTotpLogin(TotpVerifyLoginRequest req) {
+        JwtService.ParsedToken parsed;
+        try {
+            parsed = jwtService.parse(req.totpPendingToken());
+        } catch (JwtService.InvalidJwtException ex) {
+            throw new ApiException("AUTH_TOTP_TOKEN_EXPIRED",
+                    "Session TOTP expiree, veuillez vous reconnecter", HttpStatus.UNAUTHORIZED);
+        }
+        if (parsed.type() != JwtService.TokenType.TOTP_PENDING) {
+            throw new ApiException("AUTH_TOKEN_INVALID",
+                    "Type de token incorrect", HttpStatus.UNAUTHORIZED);
+        }
+        UserEntity user = userRepository.findById(parsed.userId())
+                .orElseThrow(() -> new ApiException("AUTH_REQUIRED",
+                        "Utilisateur introuvable", HttpStatus.UNAUTHORIZED));
+        if (!user.isTotpEnabled() || user.getTotpSecret() == null) {
+            throw new ApiException("TOTP_NOT_CONFIGURED",
+                    "La 2FA TOTP n'est pas activee pour ce compte", HttpStatus.CONFLICT);
+        }
+        if (!totpService.verify(user.getTotpSecret(), req.code())) {
+            throw new ApiException("TOTP_CODE_INVALID",
+                    "Code TOTP invalide", HttpStatus.UNAUTHORIZED);
+        }
+        auditService.record(user.getId(), "AUTH_TOTP_VERIFIED", "User",
+                user.getId().toString(), null, null);
         return buildSession(user);
+    }
+
+    @Transactional
+    public TotpSetupDto setupTotp(UUID userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException("AUTH_REQUIRED",
+                        "Utilisateur introuvable", HttpStatus.UNAUTHORIZED));
+        if (user.isTotpEnabled()) {
+            throw new ApiException("TOTP_ALREADY_ENABLED",
+                    "La 2FA TOTP est deja activee. Desactivez-la d'abord.", HttpStatus.CONFLICT);
+        }
+        String secret = totpService.generateSecret();
+        user.setTotpSecret(secret);
+        userRepository.save(user);
+        String uri = totpService.buildOtpauthUri(user.getEmail(), TOTP_ISSUER, secret);
+        byte[] qrBytes = totpService.generateQrCodePng(uri);
+        String qrBase64 = Base64.getEncoder().encodeToString(qrBytes);
+        return new TotpSetupDto(secret, uri, qrBase64);
+    }
+
+    @Transactional
+    public void confirmTotp(UUID userId, TotpConfirmRequest req) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException("AUTH_REQUIRED",
+                        "Utilisateur introuvable", HttpStatus.UNAUTHORIZED));
+        if (user.getTotpSecret() == null) {
+            throw new ApiException("TOTP_SETUP_REQUIRED",
+                    "Initialisez d'abord la 2FA via POST /auth/totp/setup", HttpStatus.CONFLICT);
+        }
+        if (!totpService.verify(user.getTotpSecret(), req.code())) {
+            throw new ApiException("TOTP_CODE_INVALID",
+                    "Code TOTP invalide. Verifiez l'heure de votre appareil.", HttpStatus.UNAUTHORIZED);
+        }
+        user.setTotpEnabled(true);
+        userRepository.save(user);
+        try {
+            auditService.record(userId, "TOTP_ENABLED", "User", userId.toString(), null, null);
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Transactional
+    public void disableTotp(UUID userId, String password) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException("AUTH_REQUIRED",
+                        "Utilisateur introuvable", HttpStatus.UNAUTHORIZED));
+        if (!user.isTotpEnabled()) {
+            throw new ApiException("TOTP_NOT_ENABLED",
+                    "La 2FA TOTP n'est pas activee", HttpStatus.CONFLICT);
+        }
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new ApiException("AUTH_INVALID_CREDENTIALS",
+                    "Mot de passe incorrect", HttpStatus.UNAUTHORIZED);
+        }
+        user.setTotpEnabled(false);
+        user.setTotpSecret(null);
+        userRepository.save(user);
+        try {
+            auditService.record(userId, "TOTP_DISABLED", "User", userId.toString(), null, null);
+        } catch (Exception ignored) {
+        }
     }
 
     @Transactional
@@ -136,7 +242,7 @@ public class AuthService {
         UserEntity user = userRepository.findByIdentifier(req.identifier())
                 .orElseThrow(() -> new ApiException("AUTH_USER_NOT_FOUND",
                         "Utilisateur introuvable", HttpStatus.NOT_FOUND));
-        if (user.isPhoneVerified() || user.isEmailVerified()) {
+        if (user.getStatus() != UserStatus.PENDING_VERIFICATION) {
             throw new ApiException("AUTH_ALREADY_VERIFIED",
                     "Ce compte est deja verifie", HttpStatus.CONFLICT);
         }
@@ -147,7 +253,6 @@ public class AuthService {
 
     @Transactional
     public IdentifierResponse forgotPassword(ForgotPasswordRequest req) {
-        // Reponse identique meme si l'utilisateur est inconnu (anti enumeration).
         userRepository.findByIdentifier(req.identifier()).ifPresent(u ->
                 otpService.issue(req.identifier(), OtpPurpose.PASSWORD_RESET));
         return new IdentifierResponse(req.identifier());
@@ -193,8 +298,6 @@ public class AuthService {
     }
 
     public void logout(UUID userId) {
-        // JWT stateless : la revocation cote serveur necessite une liste noire.
-        // A implementer si besoin (table revoked_tokens). Ici, action tracee uniquement.
         if (userId != null) {
             auditService.record(userId, "AUTH_LOGOUT", "User", userId.toString(), null, null);
         }
@@ -211,14 +314,6 @@ public class AuthService {
                 user.getActiveTontineId());
     }
 
-    /**
-     * Union des rôles globaux du User et des rôles de chaque Membership ACTIVE.
-     * Permet au frontend d'afficher les menus liés aux rôles tontine sans appel
-     * supplémentaire. L'autorisation effective reste vérifiée côté serveur par
-     * les *AccessChecker (Président, Censeur, ...) qui contrôlent le rôle dans la
-     * tontine ciblée — un user PRESIDENT de tontine A et MEMBRE de tontine B aura
-     * "PRESIDENT" dans User.roles mais sera refusé sur /president/* de la tontine B.
-     */
     private Set<UserRole> aggregateRoles(UserEntity user) {
         EnumSet<UserRole> roles = EnumSet.copyOf(user.getRoles());
         for (Member m : memberRepository.findByUserId(user.getId())) {
@@ -229,11 +324,6 @@ public class AuthService {
         return roles;
     }
 
-    private boolean isEmail(String identifier) {
-        return identifier != null && identifier.contains("@");
-    }
-
-    /** Retourne l'identifiant utilisé lors de l'émission de l'OTP (toujours le téléphone en priorité). */
     private String resolveOtpIdentifier(UserEntity user) {
         return user.getPhone() != null ? user.getPhone() : user.getEmail();
     }

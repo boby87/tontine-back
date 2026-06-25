@@ -2,6 +2,7 @@ package cm.ftg.tontine.audit.service;
 
 import cm.ftg.tontine.audit.entity.AuditLog;
 import cm.ftg.tontine.audit.repository.AuditLogRepository;
+import cm.ftg.tontine.common.enums.UserRole;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -13,23 +14,36 @@ public class AuditService {
     private final AuditLogRepository repository;
     private final ObjectProvider<HttpServletRequest> requestProvider;
 
-    public AuditService(AuditLogRepository repository, ObjectProvider<HttpServletRequest> requestProvider) {
+    public AuditService(AuditLogRepository repository,
+                        ObjectProvider<HttpServletRequest> requestProvider) {
         this.repository = repository;
         this.requestProvider = requestProvider;
     }
 
-    public void record(UUID actorUserId, String action, String targetType, String targetId,
-                       UUID tontineId, String payload) {
+    /** Enregistre une action sans valeurs avant/après (opérations simples). */
+    public void record(UUID performedBy, String action, String entityType, String entityId,
+                       UUID tontineId, String newValues) {
+        record(performedBy, null, action, entityType, entityId, tontineId, null, newValues);
+    }
+
+    /** Enregistre une action avec état avant et après (opérations de modification). */
+    public void record(UUID performedBy, UserRole performedByRole,
+                       String action, String entityType, String entityId,
+                       UUID tontineId, String oldValues, String newValues) {
         AuditLog log = new AuditLog();
-        log.setActorUserId(actorUserId);
+        log.setPerformedBy(performedBy);
+        log.setPerformedByRole(performedByRole);
         log.setAction(action);
-        log.setTargetType(targetType);
-        log.setTargetId(targetId);
+        log.setEntityType(entityType);
+        log.setEntityId(entityId);
         log.setTontineId(tontineId);
-        log.setPayload(payload);
+        log.setOldValues(oldValues);
+        log.setNewValues(newValues);
+
         HttpServletRequest req = requestProvider.getIfAvailable();
         if (req != null) {
             log.setIpAddress(extractClientIp(req));
+            log.setUserAgent(req.getHeader("User-Agent"));
         }
         repository.save(log);
     }
