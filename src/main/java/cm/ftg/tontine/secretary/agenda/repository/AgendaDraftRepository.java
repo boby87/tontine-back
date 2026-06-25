@@ -16,6 +16,6 @@ public interface AgendaDraftRepository extends JpaRepository<AgendaDraft, UUID> 
     long countByTontineIdAndStatus(UUID tontineId,
             cm.ftg.tontine.secretary.agenda.enums.AgendaDraftStatus status);
 
-    @Query("SELECT COALESCE(MAX(a.sessionNumber), 0) + 1 FROM AgendaDraft a WHERE a.tontineId = :tontineId AND a.deletedAt IS NULL")
+    @Query("SELECT COALESCE(MAX(a.sessionNumber), 0) + 1 FROM AgendaDraft a WHERE a.tontineId = :tontineId")
     int findNextSessionNumber(@Param("tontineId") UUID tontineId);
 }
