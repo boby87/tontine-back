@@ -54,6 +54,15 @@ public class SecretarySessionController {
         return ApiResponse.ok(service.createCycle(t, user.id(), req), "Cycle créé");
     }
 
+    @GetMapping("/sessions/{id}")
+    public ApiResponse<SessionDto> getSession(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.getSession(id, t, user.id()));
+    }
+
     @GetMapping("/sessions")
     public ApiResponse<List<SessionDto>> listSessions(
             @AuthenticationPrincipal AuthenticatedUser user,
@@ -79,6 +88,15 @@ public class SecretarySessionController {
             @Valid @RequestBody CreateBulkSessionsRequest req) {
         UUID t = tontineIdResolver.resolve(user.id(), tontineId);
         return ApiResponse.ok(service.createBulkSessions(t, user.id(), req), "Séances planifiées");
+    }
+
+    @PostMapping("/cycles/{id}/request-closure")
+    public ApiResponse<SecretaryCycleDto> requestClosure(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID id,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.requestCycleClosure(id, t, user.id()), "Demande de clôture envoyée au Président");
     }
 
     @PutMapping("/sessions/{id}")

@@ -25,13 +25,15 @@ public class RealtimeEventPublisher {
     }
 
     /**
-     * Envoie un événement à toutes les sessions actives d'un utilisateur.
+     * Envoie un evenement a toutes les sessions actives d'un utilisateur.
      *
      * Bypasse convertAndSendToUser : ce dernier envoie au brokerChannel sous
-     * /user/{userId}/queue/... alors que les abonnements sont enregistrés sous
-     * /user/{sessionId}/queue/... (après traduction par UserDestinationMessageHandler).
-     * En construisant la destination session-spécifique directement, on garantit
-     * la correspondance avec l'abonnement du broker.
+     * /user/{userId}/queue/... alors que les abonnements sont enregistres sous
+     * /queue/{name}-user{sessionId} (apres traduction par UserDestinationMessageHandler).
+     * Cette traduction fonctionne pour SockJS (web) mais echoue silencieusement pour
+     * les sessions WebSocket natives (mobile Ionic/Capacitor).
+     * On construit la destination session-specifique directement pour garantir la
+     * livraison sur les deux transports.
      */
     public void toUser(UUID userId, String queue, String eventType, Object payload) {
         if (userId == null) {
@@ -39,11 +41,18 @@ public class RealtimeEventPublisher {
         }
         SimpUser user = userRegistry.getUser(userId.toString());
         if (user == null || user.getSessions().isEmpty()) {
-            log.debug("[WS] toUser: userId={} non connecté — message ignoré", userId);
+            log.info("[WS] toUser: userId={} non connecte (aucune session active) - message ignore (type={})",
+                    userId, eventType);
             return;
         }
         RealtimeEvent event = RealtimeEvent.of(eventType, payload);
-        messagingTemplate.convertAndSendToUser(userId.toString(), queue, event);
+        log.info("[WS] toUser: userId={} - {} session(s) trouvee(s), envoi type={}",
+                userId, user.getSessions().size(), eventType);
+        user.getSessions().forEach(session -> {
+            String dest = queue + "-user" + session.getId();
+            log.info("[WS] toUser: -> destination={}", dest);
+            safeSend(dest, event);
+        });
     }
 
     public void toSession(UUID tontineId, UUID sessionId, String eventType, Object payload) {

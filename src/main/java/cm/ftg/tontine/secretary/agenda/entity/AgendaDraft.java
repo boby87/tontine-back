@@ -16,8 +16,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
+@SQLRestriction("deleted_at IS NULL")
 @Table(name = "agenda_drafts", indexes = {
         @Index(name = "idx_agenda_drafts_tontine", columnList = "tontine_id"),
         @Index(name = "idx_agenda_drafts_session", columnList = "session_id"),
@@ -72,6 +74,9 @@ public class AgendaDraft {
 
     @Column(name = "president_comment", length = 2000)
     private String presidentComment;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     @Version
     private Long version;

@@ -58,6 +58,15 @@ public class SecretaryMinutesController {
         return ApiResponse.ok(service.replaceSections(id, t, user.id(), req), "Sections mises a jour");
     }
 
+    @GetMapping("/session/{sessionId}")
+    public ApiResponse<MinutesDraftDto> getBySessionId(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID sessionId,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.findBySessionId(sessionId, t, user.id()).orElse(null));
+    }
+
     @PostMapping("/{id}/sign")
     public ApiResponse<MinutesDraftDto> sign(
             @AuthenticationPrincipal AuthenticatedUser user,

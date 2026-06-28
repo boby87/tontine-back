@@ -68,7 +68,8 @@ public class SecurityConfig {
                                 "/ws/**",
                                 "/ws-native",
                                 "/ws-native/**",
-                                "/webhooks/**"
+                                "/webhooks/**",
+                                "/debug/**"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))

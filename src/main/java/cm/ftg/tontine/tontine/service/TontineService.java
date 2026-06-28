@@ -10,6 +10,9 @@ import cm.ftg.tontine.common.exception.ApiException;
 import cm.ftg.tontine.common.exception.ResourceNotFoundException;
 import cm.ftg.tontine.member.entity.Member;
 import cm.ftg.tontine.member.repository.MemberRepository;
+import cm.ftg.tontine.notification.enums.NotificationCategory;
+import cm.ftg.tontine.notification.enums.NotificationKind;
+import cm.ftg.tontine.notification.service.NotificationService;
 import cm.ftg.tontine.president.membership.invitation.enums.InvitationChannel;
 import cm.ftg.tontine.president.membership.invitation.service.InvitationService;
 import cm.ftg.tontine.tontine.dto.CreateTontineRequest;
@@ -25,6 +28,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -34,25 +39,30 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TontineService {
 
+    private static final Logger log = LoggerFactory.getLogger(TontineService.class);
+
     private final TontineRepository tontineRepository;
     private final CycleRepository cycleRepository;
     private final MemberRepository memberRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
     private final InvitationService invitationService;
+    private final NotificationService notificationService;
 
     public TontineService(TontineRepository tontineRepository,
                           CycleRepository cycleRepository,
                           MemberRepository memberRepository,
                           UserRepository userRepository,
                           AuditService auditService,
-                          InvitationService invitationService) {
+                          InvitationService invitationService,
+                          NotificationService notificationService) {
         this.tontineRepository = tontineRepository;
         this.cycleRepository = cycleRepository;
         this.memberRepository = memberRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
         this.invitationService = invitationService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -123,6 +133,21 @@ public class TontineService {
 
         auditService.record(creatorUserId, "TONTINE_CREATE", "Tontine", saved.getId().toString(),
                 saved.getId(), "{\"name\":\"" + saved.getName() + "\"}");
+
+        try {
+            notificationService.publish(
+                    creatorUserId,
+                    saved.getId(),
+                    NotificationKind.SUCCESS,
+                    NotificationCategory.GENERAL,
+                    "Tontine créée avec succès",
+                    "Votre tontine \""  + saved.getName() + "\" a bien été créée. "
+                            + "Vous en êtes le Président. Invitez dès maintenant vos membres.",
+                    "/tontines/" + saved.getId());
+        } catch (Exception e) {
+            log.warn("[TONTINE_CREATE] Notification in-app échouée pour userId={}", creatorUserId, e);
+        }
+
         return TontineDto.from(saved);
     }
 

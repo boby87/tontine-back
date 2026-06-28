@@ -34,16 +34,27 @@ public class MemberService {
 
     @Transactional(readOnly = true)
     public MemberSummaryDto getMySummary(UUID userId, UUID tontineIdHint) {
-        Member member = resolveActiveMember(userId, tontineIdHint);
+        UUID effective = tontineIdHint;
+        if (effective == null) {
+            effective = userRepository.findById(userId)
+                    .map(UserEntity::getActiveTontineId)
+                    .orElse(null);
+        }
+        Optional<Member> memberOpt = effective != null
+                ? memberRepository.findByUserIdAndTontineId(userId, effective)
+                : memberRepository.findByUserId(userId).stream().findFirst();
+        if (memberOpt.isEmpty()) {
+            return null;
+        }
+        Member member = memberOpt.get();
         Tontine tontine = tontineRepository.findById(member.getTontineId()).orElse(null);
-        TontineDto tontineDto = tontine != null ? TontineDto.from(tontine) : null;
         return new MemberSummaryDto(
                 MemberDto.from(member),
-                tontineDto,
+                tontine != null ? TontineDto.from(tontine) : null,
                 member.getTotalContributed(),
                 member.getTotalArrears(),
-                0,                  // activeLoans — module Prets non encore implemente
-                null,               // nextSession — module Sessions non encore implemente
+                0,
+                null,
                 member.getRotationOrder(),
                 member.getTontineId());
     }

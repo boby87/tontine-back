@@ -44,6 +44,6 @@ public record MembershipInvitationDto(
                 i.getInvitedByUserId(), i.getInvitedByFullName(), i.getInvitedAt(),
                 i.getRemindersSent(),
                 i.getCancelledAt(), i.getCancelReason(),
-                baseAcceptUrl + "/invitations/" + i.getToken());
+                baseAcceptUrl + "/invitations/" + i.getToken() + "/accept");
     }
 }

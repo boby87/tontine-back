@@ -41,9 +41,12 @@ public class ConvocationService {
     }
 
     @Transactional(readOnly = true)
-    public List<ConvocationDto> list(UUID tontineId, UUID userId) {
+    public List<ConvocationDto> list(UUID tontineId, UUID userId, UUID sessionId) {
         accessChecker.requireSecretary(userId, tontineId);
-        return convocationRepository.findByTontineIdOrderByCreatedAtDesc(tontineId).stream()
+        List<Convocation> convocations = sessionId != null
+                ? convocationRepository.findByTontineIdAndSessionIdOrderByCreatedAtDesc(tontineId, sessionId)
+                : convocationRepository.findByTontineIdOrderByCreatedAtDesc(tontineId);
+        return convocations.stream()
                 .map(ConvocationDto::from)
                 .toList();
     }

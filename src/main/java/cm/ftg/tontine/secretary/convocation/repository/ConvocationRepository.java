@@ -10,4 +10,6 @@ import org.springframework.stereotype.Repository;
 public interface ConvocationRepository extends JpaRepository<Convocation, UUID> {
 
     List<Convocation> findByTontineIdOrderByCreatedAtDesc(UUID tontineId);
+
+    List<Convocation> findByTontineIdAndSessionIdOrderByCreatedAtDesc(UUID tontineId, UUID sessionId);
 }

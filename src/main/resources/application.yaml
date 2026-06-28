@@ -63,8 +63,8 @@ app:
   security:
     jwt:
       secret: "dev-only-secret-please-replace-with-a-strong-256-bit-key-managed-via-vault"
-      access-token-ttl-seconds: 900       # 15 min
-      refresh-token-ttl-seconds: 2592000  # 30 jours
+      access-token-ttl-seconds: 315360000  # 10 ans (dev — pas d'expiration pratique)
+      refresh-token-ttl-seconds: 315360000 # 10 ans
       issuer: tontine-connect
     bcrypt:
       strength: 12

@@ -214,7 +214,7 @@ public class InvitationService {
                         saved.getInvitedByFullName() + " vous relance pour rejoindre la tontine \""
                                 + tontine.getName() + "\" en tant que "
                                 + roleLabel(saved.getProposedRole()) + ".",
-                        baseAcceptUrl + "/invitations/" + saved.getToken() + "/accept");
+                        "/invitations/" + saved.getToken() + "/accept");
             } catch (Exception e) {
                 log.warn("[INVITATION_RESEND] Notification in-app échouée pour userId={}", existing.getId(), e);
             }
@@ -307,7 +307,7 @@ public class InvitationService {
                             invitedByFullName + " vous invite à rejoindre la tontine \""
                                     + tontine.getName() + "\" en tant que "
                                     + roleLabel(proposedRole) + ".",
-                            baseAcceptUrl + "/invitations/" + finalSaved.getToken() + "/accept");
+                            "/invitations/" + finalSaved.getToken() + "/accept");
                 },
                 () -> log.warn("[INVITATION] Aucun utilisateur avec le téléphone '{}' → notification in-app ignorée.", normalizedPhone));
 

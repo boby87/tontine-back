@@ -8,5 +8,6 @@ public enum NotificationCategory {
     VOTE,
     VALIDATION,
     INVITATION,
+    AGENDA,
     GENERAL
 }

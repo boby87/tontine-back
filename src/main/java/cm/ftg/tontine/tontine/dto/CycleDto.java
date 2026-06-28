@@ -1,6 +1,7 @@
 package cm.ftg.tontine.tontine.dto;
 
 import cm.ftg.tontine.tontine.entity.Cycle;
+import cm.ftg.tontine.tontine.enums.CycleStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -24,7 +25,7 @@ public record CycleDto(
                 c.getNumber(),
                 c.getStartDate(),
                 c.getEndDate(),
-                c.isActive(),
+                c.getStatus() == CycleStatus.ACTIVE,
                 c.getTotalSessions(),
                 c.getCompletedSessions(),
                 c.getTotalCollected());

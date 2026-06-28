@@ -14,6 +14,7 @@ import cm.ftg.tontine.secretary.minutes.repository.MinutesSectionRepository;
 import cm.ftg.tontine.secretary.security.SecretaryAccessChecker;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -105,6 +106,13 @@ public class MinutesService {
         auditService.record(userId, "MINUTES_SECRETARY_SIGN", "MinutesDraft", id.toString(),
                 tontineId, null);
         return MinutesDraftDto.from(saved, sectionsOf(saved.getId()));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<MinutesDraftDto> findBySessionId(UUID sessionId, UUID tontineId, UUID userId) {
+        accessChecker.requireSecretary(userId, tontineId);
+        return draftRepository.findByTontineIdAndSessionId(tontineId, sessionId)
+                .map(d -> MinutesDraftDto.from(d, sectionsOf(d.getId())));
     }
 
     private MinutesDraft loadInTontine(UUID id, UUID tontineId) {

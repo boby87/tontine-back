@@ -12,7 +12,7 @@ import java.util.Set;
 
 public record InviteMemberRequest(
         @NotBlank @Size(max = 160) String candidateFullName,
-        @NotBlank @Pattern(regexp = "^\\+237\\d{9}$") String candidatePhone,
+        @NotBlank @Pattern(regexp = "^\\+[1-9]\\d{6,14}$", message = "Le telephone doit etre au format E.164 (ex: +237699000000)") String candidatePhone,
         @Email @Size(max = 160) String candidateEmail,
         @NotNull UserRole proposedRole,
         @NotEmpty Set<InvitationChannel> channels,

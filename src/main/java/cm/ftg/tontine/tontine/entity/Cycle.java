@@ -1,7 +1,10 @@
 package cm.ftg.tontine.tontine.entity;
 
+import cm.ftg.tontine.tontine.enums.CycleStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
@@ -37,8 +40,9 @@ public class Cycle {
 
     private LocalDate endDate;
 
-    @Column(nullable = false)
-    private boolean active = false;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CycleStatus status = CycleStatus.ACTIVE;
 
     @Column(nullable = false)
     private int totalSessions = 0;
@@ -48,4 +52,5 @@ public class Cycle {
 
     @Column(name = "total_collected", precision = 19, scale = 2, nullable = false)
     private BigDecimal totalCollected = BigDecimal.ZERO;
+
 }

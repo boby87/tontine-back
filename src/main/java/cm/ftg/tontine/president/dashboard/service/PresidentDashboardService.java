@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import cm.ftg.tontine.tontine.enums.CycleStatus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -117,7 +118,7 @@ public class PresidentDashboardService {
             return cycleRepository.findById(tontine.getCurrentCycleId()).orElse(null);
         }
         return cycleRepository.findByTontineIdOrderByNumberAsc(tontine.getId()).stream()
-                .filter(Cycle::isActive)
+                .filter(c -> c.getStatus() == CycleStatus.ACTIVE)
                 .findFirst()
                 .orElse(null);
     }
