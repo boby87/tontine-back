@@ -18,15 +18,19 @@ import cm.ftg.tontine.treasurer.common.enums.PaymentMethod;
 import cm.ftg.tontine.treasurer.contribution.dto.AdvancePaymentRequest;
 import cm.ftg.tontine.treasurer.contribution.dto.ContributionDto;
 import cm.ftg.tontine.treasurer.contribution.dto.PayContributionRequest;
+import cm.ftg.tontine.treasurer.contribution.dto.RecordContributionRequest;
 import cm.ftg.tontine.treasurer.contribution.entity.Contribution;
 import cm.ftg.tontine.treasurer.contribution.enums.ContributionStatus;
+import cm.ftg.tontine.treasurer.contribution.enums.ContributionType;
 import cm.ftg.tontine.treasurer.contribution.repository.ContributionRepository;
 import cm.ftg.tontine.treasurer.security.TreasurerAccessChecker;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,12 +66,72 @@ public class ContributionService {
     }
 
     @Transactional(readOnly = true)
-    public List<ContributionDto> listBySession(UUID tontineId, UUID sessionId, UUID userId) {
+    public List<ContributionDto> listBySession(UUID tontineId, UUID sessionId, UUID userId, ContributionType type) {
         accessChecker.requireTreasurer(userId, tontineId);
         ensureSessionInTontine(sessionId, tontineId);
-        return contributionRepository.findByTontineIdAndSessionIdOrderByMemberIdAsc(tontineId, sessionId).stream()
-                .map(ContributionDto::from)
+        List<Contribution> rows = type != null
+                ? contributionRepository.findByTontineIdAndSessionIdAndContributionTypeOrderByMemberIdAsc(tontineId, sessionId, type)
+                : contributionRepository.findByTontineIdAndSessionIdOrderByMemberIdAsc(tontineId, sessionId);
+        Map<UUID, String> nameMap = memberRepository.findAllById(
+                rows.stream().map(Contribution::getMemberId).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Member::getId, this::fullName));
+        return rows.stream()
+                .map(c -> ContributionDto.from(c, nameMap.getOrDefault(c.getMemberId(), "")))
                 .toList();
+    }
+
+    @Transactional
+    public ContributionDto record(UUID tontineId, UUID userId, RecordContributionRequest req) {
+        Member collector = accessChecker.requireTreasurer(userId, tontineId);
+        ensureSessionInTontine(req.sessionId(), tontineId);
+
+        Contribution c = contributionRepository
+                .findBySessionIdAndMemberIdAndContributionType(req.sessionId(), req.memberId(), req.contributionType())
+                .orElseGet(() -> {
+                    Contribution nc = new Contribution();
+                    nc.setTontineId(tontineId);
+                    nc.setSessionId(req.sessionId());
+                    nc.setMemberId(req.memberId());
+                    nc.setContributionType(req.contributionType());
+                    nc.setExpectedAmount(BigDecimal.ZERO);
+                    return nc;
+                });
+
+        if (c.getStatus() == ContributionStatus.PAID || c.getStatus() == ContributionStatus.EXEMPTED) {
+            throw new ApiException("CONTRIBUTION_ALREADY_SETTLED",
+                    "Cette cotisation est deja reglee", HttpStatus.CONFLICT);
+        }
+
+        c.setPaidAmount(c.getPaidAmount().add(req.amount()));
+        c.setExpectedAmount(c.getPaidAmount()); // montant libre : attendu = payé
+        c.setStatus(ContributionStatus.PAID);
+        c.setPaidAt(Instant.now());
+        c.setPaymentMethod(req.paymentMethod());
+        if (req.reference() != null) c.setReference(req.reference());
+        if (req.note() != null) c.setNote(req.note());
+        c.setCollectedByUserId(userId);
+
+        Contribution saved = contributionRepository.save(c);
+
+        creditPrincipal(tontineId, req.amount(), CashMovementKind.CONTRIBUTION_IN,
+                "Cotisation " + req.contributionType() + " membre " + req.memberId(),
+                saved.getId().toString(),
+                fullName(collector));
+
+        sessionRepository.findById(req.sessionId()).ifPresent(s -> {
+            s.setTotalCollected(s.getTotalCollected().add(req.amount()));
+            sessionRepository.save(s);
+        });
+
+        memberRepository.findById(req.memberId()).ifPresent(m -> {
+            m.setTotalContributed(m.getTotalContributed().add(req.amount()));
+            memberRepository.save(m);
+        });
+
+        auditService.record(userId, "CONTRIBUTION_RECORD", "Contribution", saved.getId().toString(),
+                tontineId, "{\"type\":\"" + req.contributionType() + "\",\"amount\":\"***\"}");
+        String memberName = memberRepository.findById(req.memberId()).map(this::fullName).orElse("");
+        return ContributionDto.from(saved, memberName);
     }
 
     @Transactional

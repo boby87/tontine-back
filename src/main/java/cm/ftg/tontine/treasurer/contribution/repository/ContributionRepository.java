@@ -2,6 +2,7 @@ package cm.ftg.tontine.treasurer.contribution.repository;
 
 import cm.ftg.tontine.treasurer.contribution.entity.Contribution;
 import cm.ftg.tontine.treasurer.contribution.enums.ContributionStatus;
+import cm.ftg.tontine.treasurer.contribution.enums.ContributionType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,12 @@ import org.springframework.stereotype.Repository;
 public interface ContributionRepository extends JpaRepository<Contribution, UUID> {
 
     List<Contribution> findByTontineIdAndSessionIdOrderByMemberIdAsc(UUID tontineId, UUID sessionId);
+
+    List<Contribution> findByTontineIdAndSessionIdAndContributionTypeOrderByMemberIdAsc(
+            UUID tontineId, UUID sessionId, ContributionType contributionType);
+
+    Optional<Contribution> findBySessionIdAndMemberIdAndContributionType(
+            UUID sessionId, UUID memberId, ContributionType contributionType);
 
     @Query("SELECT c FROM Contribution c WHERE c.tontineId = :tontineId "
             + "ORDER BY COALESCE(c.paidAt, c.createdAt) DESC")

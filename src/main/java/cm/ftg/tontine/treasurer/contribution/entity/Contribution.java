@@ -2,6 +2,7 @@ package cm.ftg.tontine.treasurer.contribution.entity;
 
 import cm.ftg.tontine.treasurer.common.enums.PaymentMethod;
 import cm.ftg.tontine.treasurer.contribution.enums.ContributionStatus;
+import cm.ftg.tontine.treasurer.contribution.enums.ContributionType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -23,8 +24,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "contributions",
-        uniqueConstraints = @UniqueConstraint(name = "uk_contribution_session_member",
-                columnNames = {"session_id", "member_id"}),
+        uniqueConstraints = @UniqueConstraint(name = "uk_contribution_session_member_type",
+                columnNames = {"session_id", "member_id", "contribution_type"}),
         indexes = {
                 @Index(name = "idx_contribution_tontine", columnList = "tontine_id"),
                 @Index(name = "idx_contribution_session", columnList = "session_id"),
@@ -48,6 +49,10 @@ public class Contribution {
 
     @Column(name = "member_id", nullable = false)
     private UUID memberId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "contribution_type", nullable = false, length = 20)
+    private ContributionType contributionType = ContributionType.ORDINARY;
 
     @Column(name = "expected_amount", precision = 19, scale = 2, nullable = false)
     private BigDecimal expectedAmount = BigDecimal.ZERO;

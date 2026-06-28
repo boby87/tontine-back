@@ -6,6 +6,8 @@ import cm.ftg.tontine.security.AuthenticatedUser;
 import cm.ftg.tontine.treasurer.contribution.dto.AdvancePaymentRequest;
 import cm.ftg.tontine.treasurer.contribution.dto.ContributionDto;
 import cm.ftg.tontine.treasurer.contribution.dto.PayContributionRequest;
+import cm.ftg.tontine.treasurer.contribution.dto.RecordContributionRequest;
+import cm.ftg.tontine.treasurer.contribution.enums.ContributionType;
 import cm.ftg.tontine.treasurer.contribution.service.ContributionService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -36,9 +38,19 @@ public class ContributionController {
     public ApiResponse<List<ContributionDto>> list(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId,
-            @RequestParam UUID sessionId) {
+            @RequestParam UUID sessionId,
+            @RequestParam(required = false) ContributionType type) {
         UUID t = tontineIdResolver.resolve(user.id(), tontineId);
-        return ApiResponse.ok(service.listBySession(t, sessionId, user.id()));
+        return ApiResponse.ok(service.listBySession(t, sessionId, user.id(), type));
+    }
+
+    @PostMapping("/record")
+    public ApiResponse<ContributionDto> record(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestHeader(value = "X-Tontine-Id", required = false) UUID tontineId,
+            @Valid @RequestBody RecordContributionRequest req) {
+        UUID t = tontineIdResolver.resolve(user.id(), tontineId);
+        return ApiResponse.ok(service.record(t, user.id(), req), "Cotisation enregistree");
     }
 
     @PostMapping("/{id}/pay")

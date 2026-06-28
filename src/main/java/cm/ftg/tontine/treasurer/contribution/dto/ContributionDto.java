@@ -3,6 +3,7 @@ package cm.ftg.tontine.treasurer.contribution.dto;
 import cm.ftg.tontine.treasurer.common.enums.PaymentMethod;
 import cm.ftg.tontine.treasurer.contribution.entity.Contribution;
 import cm.ftg.tontine.treasurer.contribution.enums.ContributionStatus;
+import cm.ftg.tontine.treasurer.contribution.enums.ContributionType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -12,6 +13,8 @@ public record ContributionDto(
         UUID tontineId,
         UUID sessionId,
         UUID memberId,
+        String memberName,
+        ContributionType contributionType,
         BigDecimal expectedAmount,
         BigDecimal paidAmount,
         ContributionStatus status,
@@ -23,8 +26,14 @@ public record ContributionDto(
 ) {
 
     public static ContributionDto from(Contribution c) {
+        return from(c, null);
+    }
+
+    public static ContributionDto from(Contribution c, String memberName) {
         return new ContributionDto(
                 c.getId(), c.getTontineId(), c.getSessionId(), c.getMemberId(),
+                memberName,
+                c.getContributionType(),
                 c.getExpectedAmount(), c.getPaidAmount(), c.getStatus(), c.getPaidAt(),
                 c.getPaymentMethod(), c.getReference(), c.getCollectedByUserId(), c.getNote());
     }
